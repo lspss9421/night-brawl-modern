@@ -45,8 +45,9 @@ export const sawa: CharacterDef = {
       },
       cmds: [
         { motion: '623', move: 'dp', od: 'dpOD', sp: 'd' },
+        // ↓↘→ + 輕 = 舞步旋踢；↓↘→ + 中／重 = 愛心波動（兩顆鍵一起按：有輕 = 旋踢 OD、中＋重 = 愛心波動 OD）
+        { motion: '236', btn: 'L', move: 'rush', od: 'rushOD', sp: 'f' },
         { motion: '236', move: 'sp', od: 'spOD', sp: 'n' },
-        { motion: '214', move: 'rush', od: 'rushOD', sp: 'f' },
       ],
     },
   },
@@ -93,7 +94,7 @@ export const sawa: CharacterDef = {
         hitbox: { x: 45, y: 90, w: 80, h: 190 }, slowmo: 30,
       }),
       move({
-        // ↓↙← + 腳：像芭蕾舞一樣踮腳旋轉三圈、腿伸直掃出去，每圈踢一下（三段），被防 -4。
+        // ↓↘→ + 輕：像芭蕾舞一樣踮腳旋轉三圈、腿伸直掃出去，每圈踢一下（三段），被防 -4。
         // 動畫：踮腳準備 →（腿朝對手時踢中：第 16、28、40 格）→ 腿放下，共 61 格
         id: 'rush', name: '舞步旋踢', kind: 'special', driveCost: SP_COST, startup: 15, active: 27, recovery: 19,
         damage: 30, hitstun: 18, blockstun: 14, hitstop: 7, pushback: 250, advance: 350,

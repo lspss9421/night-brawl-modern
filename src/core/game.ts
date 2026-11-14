@@ -748,7 +748,7 @@ function commandMove(s: GameState, f: FighterState, st: FormStats, b: InputBits,
     if (!cmds.some((c) => c.motion === motion) || !motionDone(s, f, motion)) continue;
     for (const c of cmds) {
       if (c.motion !== motion) continue;
-      if (!(b & LMH)) continue;
+      if (!(b & (c.btn ? Btn[c.btn] : LMH))) continue;
       if (c.od && attackCount(both) >= 2 && moveUsable(s, f, c.od)) return { id: c.od, assisted: false };
       if (moveUsable(s, f, c.move)) return { id: c.move, assisted: false };
     }

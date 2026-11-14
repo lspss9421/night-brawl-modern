@@ -283,10 +283,10 @@ describe('鬥氣（Drive）', () => {
   it('兩個拳差 1～2 格才按到，也會變成 OD（只扣 OD 的 3 格）', () => {
     for (const gap of [1, 2]) {
       const s = ready('sawa', 'mio', 300, 900);
-      motion(s, [2, 3, 6], L);
+      motion(s, [2, 3, 6], M);
       expect(s.fighters[0].moveId).toBe('sp');
-      run(s, gap - 1, RIGHT | L);
-      step(s, [RIGHT | L | H, 0]);
+      run(s, gap - 1, RIGHT | M);
+      step(s, [RIGHT | M | H, 0]);
       expect(s.fighters[0].moveId, `gap ${gap}`).toBe('spOD');
       expect(s.fighters[0].drive).toBeLessThan(DRIVE_MAX - 3 * DRIVE_BAR + 300);
       expect(s.fighters[0].drive).toBeGreaterThan(DRIVE_MAX - 3 * DRIVE_BAR - 300);
@@ -444,7 +444,7 @@ describe('Mio', () => {
     expect(s1.fighters[1].hp).toBe(900);
 
     const s2 = ready('mio', 'sawa', 400, 400 + gap);
-    motion(s2, [2, 3, 6], L);
+    motion(s2, [2, 3, 6], M);
     run(s2, 40);
     expect(s2.fighters[1].hp).toBe(900 - 90);
   });
@@ -633,8 +633,8 @@ describe('測試選項', () => {
 });
 
 describe('指令技', () => {
-  it('Sawa：↓↘→ 拳 = 愛心波動、→↓↘ 拳 = 上勾拳、↓↙← 腳 = 旋踢', () => {
-    const cases: [number[], number, string][] = [[[2, 3, 6], L, 'sp'], [[6, 2, 3], H, 'dp'], [[2, 1, 4], M, 'rush'], [[6, 2, 3], M | H, 'dpOD']];
+  it('Sawa：↓↘→＋輕 = 舞步旋踢、↓↘→＋中／重 = 愛心波動、→↓↘ = 上勾拳', () => {
+    const cases: [number[], number, string][] = [[[2, 3, 6], L, 'rush'], [[2, 3, 6], M, 'sp'], [[2, 3, 6], H, 'sp'], [[6, 2, 3], H, 'dp'], [[6, 2, 3], M | H, 'dpOD'], [[2, 3, 6], L | M, 'rushOD'], [[2, 3, 6], M | H, 'spOD']];
     for (const [dirs, btn, id] of cases) {
       const s = ready('sawa', 'mio', 300, 900);
       motion(s, dirs, btn);
@@ -645,9 +645,30 @@ describe('指令技', () => {
 
   it('搓招打中是全傷害；特殊鍵簡易操作是 8 成', () => {
     const a = ready('sawa', 'mio', 300, 900);
-    motion(a, [2, 3, 6], L);
+    motion(a, [2, 3, 6], M);
     run(a, 120);
     expect(a.fighters[1].hp).toBe(1000 - 60);
+  });
+
+  it('Mio：↓↘→＋輕 = 貓咪突擊、↓↘→＋中／重 = 鞭擊、↓↙← 不再出貓咪', () => {
+    const cases: [number[], number, string][] = [[[2, 3, 6], L, 'cat'], [[2, 3, 6], M, 'sp'], [[2, 3, 6], H, 'sp'], [[2, 3, 6], L | H, 'catOD'], [[2, 3, 6], M | H, 'spOD']];
+    for (const [dirs, btn, id] of cases) {
+      const s = ready('mio', 'sawa', 300, 900);
+      motion(s, dirs, btn);
+      expect(s.fighters[0].moveId, id).toBe(id);
+    }
+    const t = ready('mio', 'sawa', 300, 900);
+    motion(t, [2, 1, 4], M);
+    expect(t.fighters[0].moveId).not.toBe('cat');
+    const u = ready('mio', 'sawa', 300, 900);
+    tap(u, SP);
+    expect(u.fighters[0].moveId).toBe('sp'); // 特殊鍵 = 鞭擊
+  });
+
+  it('Sawa 的 ↓↙← 不再是旋踢', () => {
+    const s = ready('sawa', 'mio', 300, 900);
+    motion(s, [2, 1, 4], M);
+    expect(s.fighters[0].moveId).not.toBe('rush');
   });
 
   it('特殊鍵 + 方向：下 = 對空技、前 = 突進技', () => {
@@ -666,7 +687,7 @@ describe('指令技', () => {
     step(s, [DOWN | L, 0]);
     let k = 0;
     while ((s.fighters[0].hitsDone === 0 || s.hitstop > 0) && k++ < 30) step(s, [DOWN, 0]);
-    motion(s, [3, 6], L); // ↓ 已經按著：再 ↘→ + 拳
+    motion(s, [3, 6], M); // ↓ 已經按著：再 ↘→ + 中
     expect(s.fighters[0].moveId).toBe('sp');
   });
 });
@@ -770,7 +791,7 @@ describe('上勾拳打中的慢動作', () => {
 describe('舞步旋踢', () => {
   it('轉三圈、三段傷害', () => {
     const s = ready('sawa', 'mio', 500, 600);
-    motion(s, [2, 1, 4], M);
+    motion(s, [2, 3, 6], L);
     expect(s.fighters[0].moveId).toBe('rush');
     let hits = 0, last = 1000;
     for (let k = 0; k < 90; k++) {
@@ -784,7 +805,7 @@ describe('舞步旋踢', () => {
 describe('Mio 貓咪突擊', () => {
   it('貓咪撲中：黏在臉上抓三下，抓完消失', () => {
     const s = ready('mio', 'sawa', 400, 650);
-    motion(s, [2, 1, 4], M);
+    motion(s, [2, 3, 6], L);
     expect(s.fighters[0].moveId).toBe('cat');
     let hits = 0, last = s.fighters[1].hp, latched = false;
     for (let k = 0; k < 120; k++) {
@@ -799,7 +820,7 @@ describe('Mio 貓咪突擊', () => {
 
   it('貓咪先出現在 Mio 腳邊等著，Mio 指向對手時才飛出去', () => {
     const s = ready('mio', 'sawa', 400, 900);
-    motion(s, [2, 1, 4], M);
+    motion(s, [2, 3, 6], L);
     let k = 0;
     while (!s.projectiles.length && k++ < 20) step(s, [0, 0]);
     const p = s.projectiles[0];
@@ -815,7 +836,7 @@ describe('Mio 貓咪突擊', () => {
 
   it('Mio 召喚時被打斷：貓咪消失', () => {
     const s = ready('mio', 'sawa', 400, 490);
-    motion(s, [2, 1, 4], M);
+    motion(s, [2, 3, 6], L);
     let k = 0;
     while (!s.projectiles.length && k++ < 20) step(s, [0, 0]);
     expect(s.projectiles.length).toBe(1);
@@ -827,7 +848,7 @@ describe('Mio 貓咪突擊', () => {
 
   it('被防住：不會黏上去，直接消失', () => {
     const s = ready('mio', 'sawa', 400, 650);
-    motion(s, [2, 1, 4], M);
+    motion(s, [2, 3, 6], L);
     let hits = 0;
     const hp = s.fighters[1].hp;
     for (let k = 0; k < 120; k++) { step(s, [0, RIGHT]); if (s.projectiles.some((p) => p.latch)) hits++; }
@@ -838,7 +859,7 @@ describe('Mio 貓咪突擊', () => {
 
   it('沒撲到（太遠）：飛一段後消失', () => {
     const s = ready('mio', 'sawa', 100, 1200);
-    motion(s, [2, 1, 4], M);
+    motion(s, [2, 3, 6], L);
     run(s, 20);
     expect(s.projectiles.length).toBe(1);
     run(s, 60);

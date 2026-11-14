@@ -46,8 +46,9 @@ export const mio: CharacterDef = {
       },
       cmds: [
         { motion: '623', move: 'dp', od: 'dpOD', sp: 'd' },
+        // ↓↘→ + 輕 = 貓咪突擊；↓↘→ + 中／重 = 鞭擊（兩顆鍵一起按：有輕 = 貓咪 OD、中＋重 = 鞭擊 OD）
+        { motion: '236', btn: 'L', move: 'cat', od: 'catOD', sp: 'f' },
         { motion: '236', move: 'sp', od: 'spOD', sp: 'n' },
-        { motion: '214', move: 'cat', od: 'catOD', sp: 'f' },
       ],
     },
     dino: {
@@ -116,7 +117,7 @@ export const mio: CharacterDef = {
         hitbox: { x: 10, y: 100, w: 120, h: 200 },
       }),
       move({
-        // ↓↙← + 腳：召喚貓咪 → 用手指向對手 → 貓咪飛撲過去，撲到臉上連抓三下後消失；被防或沒撲到就消失
+        // ↓↘→ + 輕：召喚貓咪 → 用手指向對手 → 貓咪飛撲過去，撲到臉上連抓三下後消失；被防或沒撲到就消失
         id: 'cat', name: '貓咪突擊', kind: 'special', driveCost: SP_COST, startup: 16, active: 1, recovery: 26,
         damage: 25, hitstun: 20, blockstun: 14, hitstop: 6, pushback: 150,
         // 第 7 格貓咪出現在腳邊（舉手召喚），第 16 格 Mio 指向對手時飛撲出去

@@ -2,7 +2,7 @@ import { Btn, type InputBits } from '../core/input';
 
 export type KeyMap = Record<keyof typeof Btn, string[]>;
 
-// P1（現代操作）：WASD 移動，J/K/L 輕中重，U 特殊，I 鬥氣，T 挑釁
+// P1（現代操作）：WASD 移動，J/K/L 輕中重，O 特殊，I 鬥氣，T 挑釁
 export const P1_KEYS: KeyMap = {
   UP: ['KeyW'],
   DOWN: ['KeyS'],
@@ -11,7 +11,7 @@ export const P1_KEYS: KeyMap = {
   L: ['KeyJ'],
   M: ['KeyK'],
   H: ['KeyL'],
-  SP: ['KeyU'],
+  SP: ['KeyO'],
   DRIVE: ['KeyI'],
   TAUNT: ['KeyT'],
 };

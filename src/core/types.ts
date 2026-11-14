@@ -82,6 +82,8 @@ export interface MoveDef {
 export interface CommandDef {
   /** 236 = ↓↘→、623 = →↓↘、214 = ↓↙←（以面向為準） */
   motion: '236' | '623' | '214';
+  /** 只有按這顆攻擊鍵才出（沒設定 = 輕中重任一顆） */
+  btn?: 'L' | 'M' | 'H';
   move: string;
   /** 兩顆攻擊鍵一起按 = OD 強化版 */
   od?: string;
