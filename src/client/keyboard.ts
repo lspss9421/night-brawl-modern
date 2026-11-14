@@ -2,34 +2,33 @@ import { Btn, type InputBits } from '../core/input';
 
 export type KeyMap = Record<keyof typeof Btn, string[]>;
 
-// P1：WASD 移動，U/I 輕重拳，J/K 輕重腳，L 特殊，T 挑釁，O 鬥氣
+// P1（現代操作）：WASD 移動，J/K/L 輕中重，U 特殊，I 鬥氣，T 挑釁
 export const P1_KEYS: KeyMap = {
   UP: ['KeyW'],
   DOWN: ['KeyS'],
   LEFT: ['KeyA'],
   RIGHT: ['KeyD'],
-  LP: ['KeyU'],
-  HP: ['KeyI'],
-  LK: ['KeyJ'],
-  HK: ['KeyK'],
-  SP: ['KeyL'],
+  L: ['KeyJ'],
+  M: ['KeyK'],
+  H: ['KeyL'],
+  SP: ['KeyU'],
+  DRIVE: ['KeyI'],
   TAUNT: ['KeyT'],
-  DRIVE: ['KeyO'],
 };
 
-// P2（同一台電腦對打用）：方向鍵移動，P/[ 輕重拳，;/' 輕重腳，] 特殊，\ 挑釁，/ 鬥氣；也可用數字鍵盤
+// P2（同一台電腦對打用）：方向鍵移動，數字鍵盤 1/2/3 輕中重、4 特殊、5 鬥氣、9 挑釁；
+// 沒有數字鍵盤：, . / 輕中重、; 特殊、' 鬥氣、\ 挑釁
 export const P2_KEYS: KeyMap = {
   UP: ['ArrowUp'],
   DOWN: ['ArrowDown'],
   LEFT: ['ArrowLeft'],
   RIGHT: ['ArrowRight'],
-  LP: ['KeyP', 'Numpad4'],
-  HP: ['BracketLeft', 'Numpad5'],
-  LK: ['Semicolon', 'Numpad1'],
-  HK: ['Quote', 'Numpad2'],
-  SP: ['BracketRight', 'Numpad6'],
-  TAUNT: ['Backslash', 'Numpad9'],
-  DRIVE: ['Slash', 'Numpad3'],
+  L: ['Numpad1', 'Comma'],
+  M: ['Numpad2', 'Period'],
+  H: ['Numpad3', 'Slash'],
+  SP: ['Numpad4', 'Semicolon'],
+  DRIVE: ['Numpad5', 'Quote'],
+  TAUNT: ['Numpad9', 'Backslash'],
 };
 
 export class Keyboard {

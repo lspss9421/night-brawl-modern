@@ -73,18 +73,18 @@ function updateSelect(): void {
     else ready[1] = false;
   }
   const n = CHARACTER_IDS.length;
-  // 左右選擇用各自設定的按鍵；Enter 確定（先 P1、再 P2）；輕腳取消
+  // 左右選擇用各自設定的按鍵；Enter 確定（先 P1、再 P2）；輕攻擊取消
   if (!ready[0]) {
     if (kb.consumeAny(P1_KEYS.LEFT)) { cursor[0] = (cursor[0] + n - 1) % n; audio.play('menu'); }
     if (kb.consumeAny(P1_KEYS.RIGHT)) { cursor[0] = (cursor[0] + 1) % n; audio.play('menu'); }
-  } else if (kb.consumeAny(P1_KEYS.LK)) ready[0] = false;
+  } else if (kb.consumeAny(P1_KEYS.L)) ready[0] = false;
   // 電腦／假人模式時由 P1 一起幫 P2 選角（上／下切換）
   if (p2Mode !== 'human') {
     if (kb.consumeAny(P1_KEYS.UP) || kb.consumeAny(P1_KEYS.DOWN)) { cursor[1] = (cursor[1] + 1) % n; audio.play('menu'); }
   } else if (!ready[1]) {
     if (kb.consumeAny(P2_KEYS.LEFT)) { cursor[1] = (cursor[1] + n - 1) % n; audio.play('menu'); }
     if (kb.consumeAny(P2_KEYS.RIGHT)) { cursor[1] = (cursor[1] + 1) % n; audio.play('menu'); }
-  } else if (kb.consumeAny(P2_KEYS.LK)) ready[1] = false;
+  } else if (kb.consumeAny(P2_KEYS.L)) ready[1] = false;
   if (kb.consume('Enter')) {
     if (!ready[0]) lockIn(0);
     else if (p2Mode === 'human' && !ready[1]) lockIn(1);
@@ -262,10 +262,10 @@ if (roomFromUrl) {
 function renderHelp(): void {
   const k = (p: 1 | 2, a: Action) => `<kbd>${keysOf(p, a)}</kbd>`;
   const line = (p: 1 | 2) =>
-    `<b>P${p}</b> ${k(p, 'UP')}${k(p, 'LEFT')}${k(p, 'DOWN')}${k(p, 'RIGHT')} 移動 · ${k(p, 'LP')}/${k(p, 'HP')} 輕/重拳 · ${k(p, 'LK')}/${k(p, 'HK')} 輕/重腳 · ` +
-    `${k(p, 'SP')} 特殊（加↓／加前換招，加重拳 = OD，傷害 8 成） · ${k(p, 'SP')}+${k(p, 'HK')} 必殺 · 前+${k(p, 'HP')}+${k(p, 'HK')} 投技 · ${k(p, 'DRIVE')} 鬥氣 · ${k(p, 'TAUNT')} 挑釁`;
+    `<b>P${p}</b> ${k(p, 'UP')}${k(p, 'LEFT')}${k(p, 'DOWN')}${k(p, 'RIGHT')} 移動 · ${k(p, 'L')}/${k(p, 'M')}/${k(p, 'H')} 輕/中/重 · ` +
+    `${k(p, 'SP')} 特殊（加↓／加前換招，加中 = OD，傷害 8 成） · ${k(p, 'SP')}+${k(p, 'H')} 必殺 · ${k(p, 'L')}+${k(p, 'M')} 投技 · ${k(p, 'DRIVE')} 鬥氣 · ${k(p, 'TAUNT')} 挑釁`;
   $('help').innerHTML = `${line(1)}<br />${line(2)}<br />` +
-    '指令技：↓↘→＋拳、→↓↘＋拳、↓↙←＋腳（扣 2 格鬥氣；兩個拳／兩個腳一起按 = OD 強化版，扣 3 格） · ' +
+    '指令技：↓↘→、→↓↘、↓↙← ＋任一攻擊鍵（扣 2 格鬥氣；兩顆攻擊鍵一起按 = OD 強化版，扣 3 格） · ' +
     '前＋鬥氣 = 鬥氣衝擊（霸體，牆邊打中會撞牆） · 普通技打中後按鬥氣、檔架中連按兩下前 = 鬥氣衝刺 · ' +
     '按住「後」防禦、蹲著按住後 = 蹲防 · 按住鬥氣 = 檔架 · 防禦中按鬥氣 = 鬥氣反擊 · 被抓時按投技 = 拆投 · 連按兩下前/後 = 衝刺/後撤 · ' +
     (import.meta.env.DEV ? '<kbd>F1</kbd> 判定框 · ' : '') + '<kbd>F2</kbd> 切換玩家 2／電腦（簡單・普通・困難）／假人 · <kbd>Esc</kbd> 返回';

@@ -2,7 +2,7 @@
 import { audio, type AudioSettings } from './audio';
 import { P1_KEYS, P2_KEYS, type KeyMap } from './keyboard';
 
-const STORAGE_KEY = 'sawamio-settings-v1';
+const STORAGE_KEY = 'nightbrawl-modern-settings-v1'; // 和經典操作版分開存（同一個網域）
 
 export type Action = keyof KeyMap;
 
@@ -12,10 +12,9 @@ export const ACTIONS: [Action, string][] = [
   ['DOWN', '下（蹲）'],
   ['LEFT', '左'],
   ['RIGHT', '右'],
-  ['LP', '輕拳'],
-  ['HP', '重拳'],
-  ['LK', '輕腳'],
-  ['HK', '重腳'],
+  ['L', '輕攻擊'],
+  ['M', '中攻擊'],
+  ['H', '重攻擊'],
   ['SP', '特殊技'],
   ['DRIVE', '鬥氣'],
   ['TAUNT', '挑釁'],

@@ -199,7 +199,7 @@ export class OnlineGame {
         this.ready[me] = true; changed = true; audio.play('confirm');
         if (CHARACTER_IDS[this.cursor[me]] === 'mio') audio.play('mio_select'); // 鎖定 Mio 播語音
       }
-    } else if (kb.consumeAny([...P1_KEYS.LK, ...P2_KEYS.LK])) { this.ready[me] = false; changed = true; }
+    } else if (kb.consumeAny([...P1_KEYS.L, ...P2_KEYS.L])) { this.ready[me] = false; changed = true; }
     if (changed) { this.sendPick(); this.updateCountdown(); }
     // 倒數：每秒嗶一聲，數完房主開打
     if (this.countdown > 0) {
@@ -236,7 +236,7 @@ export class OnlineGame {
         break;
       case 'select':
         r.drawSelect(CHARACTER_IDS, this.cursor, this.ready, this.ready[0] && this.ready[1] ? '開始！' : '雙方都按 Enter 確定就開始',
-          '← / → 選擇、Enter 確定、輕腳取消　　Esc：離開房間', tags, this.countdown / 60);
+          '← / → 選擇、Enter 確定、輕攻擊取消　　Esc：離開房間', tags, this.countdown / 60);
         break;
       case 'match': {
         const s = this.session!;

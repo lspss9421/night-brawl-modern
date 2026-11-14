@@ -2,7 +2,7 @@
 // 相同的初始狀態 + 相同的輸入序列 => 一定得到相同結果（rollback 連線的前提）。
 import { animRef, frameIndexAt } from './anim';
 import { getChar } from './characters';
-import { ATTACK_BUTTONS, Btn, held, horizontal, type InputBits } from './input';
+import { ATTACK_BUTTONS, attackCount, Btn, held, horizontal, LMH, type InputBits } from './input';
 import type {
   Action,
   Box,
@@ -587,9 +587,9 @@ function updateFighter(s: GameState, i: 0 | 1, input: InputBits): void {
       updateThrow(s, i, c);
       break;
     case 'thrown': {
-      // 拆投：被抓後短時間內也按投技（重拳 + 重腳）
+      // 拆投：被抓後短時間內也按投技（輕 + 中）
       const both = f.bufBits | input;
-      if (f.frame <= THROW_TECH_WINDOW && (f.bufBits & (Btn.HP | Btn.HK)) && (both & Btn.HP) && (both & Btn.HK)) {
+      if (f.frame <= THROW_TECH_WINDOW && (f.bufBits & (Btn.L | Btn.M)) && (both & Btn.L) && (both & Btn.M)) {
         throwTech(s, i);
       }
       break; // 其餘由投技方控制
@@ -675,8 +675,8 @@ function tryAttack(s: GameState, i: 0 | 1, input: InputBits, ctx: AttackCtx): bo
     !!id && (ctx === 'ground' || ctx === 'air' || (ctx === 'cancel' && !!cur?.cancel?.includes(id)) || ctx === 'kara');
   const both = b | input;
 
-  // 必殺技：L + K 同按
-  if (ctx !== 'air' && (b & (Btn.SP | Btn.HK)) && (both & Btn.SP) && (both & Btn.HK)
+  // 必殺技：特殊 + 重 同按
+  if (ctx !== 'air' && (b & (Btn.SP | Btn.H)) && (both & Btn.SP) && (both & Btn.H)
     && f.meter >= METER_MAX && f.form === 'normal' && (ctx !== 'cancel' || allowed(c.super))) {
     f.meter = 0;
     startMove(s, i, c.super);
@@ -684,7 +684,7 @@ function tryAttack(s: GameState, i: 0 | 1, input: InputBits, ctx: AttackCtx): bo
   }
   if (ctx === 'kara') {
     // 招式剛出的前幾格內補按，可轉成投技
-    if ((b & (Btn.HP | Btn.HK)) && (both & Btn.HP) && (both & Btn.HK) && f.form === 'normal') { startMove(s, i, 'throwWhiff'); return true; }
+    if ((b & (Btn.L | Btn.M)) && (both & Btn.L) && (both & Btn.M) && f.form === 'normal') { startMove(s, i, 'throwWhiff'); return true; }
     return false;
   }
   // 指令技（搓招 + 拳／腳），或特殊鍵的簡易操作
@@ -696,8 +696,8 @@ function tryAttack(s: GameState, i: 0 | 1, input: InputBits, ctx: AttackCtx): bo
       return true;
     }
   }
-  // 投技：→ + 重拳 + 重腳
-  if (ctx === 'ground' && (b & (Btn.HP | Btn.HK)) && (both & Btn.HP) && (both & Btn.HK)
+  // 投技：輕 + 中（不能按著後）
+  if (ctx === 'ground' && (b & (Btn.L | Btn.M)) && (both & Btn.L) && (both & Btn.M)
     && horizontal(input, f.facing) >= 0 && f.form === 'normal') {
     startMove(s, i, 'throwWhiff');
     return true;
@@ -714,18 +714,16 @@ function tryAttack(s: GameState, i: 0 | 1, input: InputBits, ctx: AttackCtx): bo
     if (id && !moveUsable(s, f, id)) id = undefined; // 鬥氣不夠或燃盡中
   }
   if (!id && ctx === 'air') {
-    // 空中四個鍵各是不同的招
-    if (b & Btn.HP) id = st.moves.jHP;
-    else if (b & Btn.HK) id = st.moves.jHK;
-    else if (b & Btn.LP) id = st.moves.jLP;
-    else if (b & Btn.LK) id = st.moves.jLK;
-  } else if (!id && (b & (Btn.HP | Btn.HK | Btn.LP | Btn.LK))) {
+    // 空中：輕／中／重各是不同的招（同時按以重的優先）
+    if (b & Btn.H) id = st.moves.jH;
+    else if (b & Btn.M) id = st.moves.jM;
+    else if (b & Btn.L) id = st.moves.jL;
+  } else if (!id && (b & LMH)) {
     const crouch = held(input, Btn.DOWN) && st.canCrouch;
     const pick = (btn: number, sid?: string, cid?: string) => ((b & btn) ? (crouch ? cid : sid) : undefined);
-    id = pick(Btn.HP, st.moves.sHP, st.moves.cHP)
-      ?? pick(Btn.HK, st.moves.sHK, st.moves.cHK)
-      ?? pick(Btn.LP, st.moves.sLP, st.moves.cLP)
-      ?? pick(Btn.LK, st.moves.sLK, st.moves.cLK);
+    id = pick(Btn.H, st.moves.sH, st.moves.cH)
+      ?? pick(Btn.M, st.moves.sM, st.moves.cM)
+      ?? pick(Btn.L, st.moves.sL, st.moves.cL);
   }
   if (!allowed(id)) return false;
   // 空中只能出空中招（特殊技、地面招在空中按了沒反應）
@@ -742,27 +740,24 @@ function moveUsable(s: GameState, f: FighterState, id: string): boolean {
   return !m.driveCost || canSpend(f, m.driveCost);
 }
 
-/** 依搓招和按鍵找出要出的特殊技；兩個拳（或兩個腳）一起按 = OD 強化版（鬥氣不夠就出一般版） */
+/** 依搓招和按鍵找出要出的特殊技：搓招 + 任一攻擊鍵；兩顆攻擊鍵一起按 = OD 強化版（鬥氣不夠就出一般版） */
 function commandMove(s: GameState, f: FighterState, st: FormStats, b: InputBits, both: InputBits, input: InputBits): { id: string; assisted: boolean } | null {
   const cmds = st.cmds ?? [];
   if (!cmds.length) return null;
-  const P = Btn.LP | Btn.HP;
-  const K = Btn.LK | Btn.HK;
   for (const motion of ['623', '236', '214'] as const) {
     if (!cmds.some((c) => c.motion === motion) || !motionDone(s, f, motion)) continue;
     for (const c of cmds) {
       if (c.motion !== motion) continue;
-      const mask = c.btn === 'P' ? P : K;
-      if (!(b & mask)) continue;
-      if (c.od && (both & mask) === mask && moveUsable(s, f, c.od)) return { id: c.od, assisted: false };
+      if (!(b & LMH)) continue;
+      if (c.od && attackCount(both) >= 2 && moveUsable(s, f, c.od)) return { id: c.od, assisted: false };
       if (moveUsable(s, f, c.move)) return { id: c.move, assisted: false };
     }
   }
   if (b & Btn.SP) {
     const v = held(input, Btn.DOWN) ? 'd' : horizontal(input, f.facing) === 1 ? 'f' : 'n';
     const c = cmds.find((x) => x.sp === v) ?? cmds.find((x) => x.sp === 'n');
-    // 簡易操作的 OD：特殊鍵 + 重拳
-    if (c?.od && (both & Btn.HP) && moveUsable(s, f, c.od)) return { id: c.od, assisted: true };
+    // 簡易操作的 OD：特殊 + 中（特殊 + 重是必殺技）
+    if (c?.od && (both & Btn.M) && moveUsable(s, f, c.od)) return { id: c.od, assisted: true };
     if (c && moveUsable(s, f, c.move)) return { id: c.move, assisted: true };
   }
   return null;
@@ -878,12 +873,12 @@ function updateAttack(s: GameState, i: 0 | 1, input: InputBits, c: CharacterDef,
   const m = currentMove(f);
   if (!m) { setAction(f, 'idle'); return; }
 
-  // 特殊技剛出的前 3 格：補按另一個拳（腳）= 升級成 OD（鍵盤很難兩個鍵剛好同一格按下）
+  // 特殊技剛出的前 3 格：補按第二顆攻擊鍵（簡易操作補按中）= 升級成 OD（鍵盤很難兩個鍵剛好同一格按下）
   if (m.kind === 'special' && !m.od && f.frame <= 3) {
     const cmd = st.cmds?.find((x) => x.move === m.id && x.od);
-    const mask = f.assisted ? Btn.SP | Btn.HP : cmd?.btn === 'K' ? Btn.LK | Btn.HK : Btn.LP | Btn.HP;
+    const odPressed = f.assisted ? (input & (Btn.SP | Btn.M)) === (Btn.SP | Btn.M) : attackCount(input) >= 2;
     const od = cmd?.od ? c.moves[cmd.od] : undefined;
-    if (od && (input & mask) === mask && !f.burnout && f.drive + (m.driveCost ?? 0) >= (od.driveCost ?? 0)) {
+    if (od && odPressed && !f.burnout && f.drive + (m.driveCost ?? 0) >= (od.driveCost ?? 0)) {
       const assisted = f.assisted;
       f.drive += m.driveCost ?? 0; // 退回一般版扣的鬥氣，改扣 OD 的
       startMove(s, i, od.id);

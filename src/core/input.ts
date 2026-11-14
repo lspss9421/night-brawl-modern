@@ -4,10 +4,9 @@ export const Btn = {
   DOWN: 1 << 1,
   LEFT: 1 << 2,
   RIGHT: 1 << 3,
-  LP: 1 << 4, // 輕拳
-  HP: 1 << 5, // 重拳
-  LK: 1 << 6, // 輕腳
-  HK: 1 << 7, // 重腳
+  L: 1 << 4, // 輕攻擊
+  M: 1 << 5, // 中攻擊
+  H: 1 << 6, // 重攻擊
   SP: 1 << 8, // 特殊
   TAUNT: 1 << 9, // 挑釁
   DRIVE: 1 << 10, // 鬥氣（按住檔架、防禦中按 = 鬥氣反擊）
@@ -15,7 +14,14 @@ export const Btn = {
 
 export type InputBits = number;
 
-export const ATTACK_BUTTONS = Btn.LP | Btn.HP | Btn.LK | Btn.HK | Btn.SP | Btn.TAUNT | Btn.DRIVE;
+export const ATTACK_BUTTONS = Btn.L | Btn.M | Btn.H | Btn.SP | Btn.TAUNT | Btn.DRIVE;
+/** 三顆攻擊鍵 */
+export const LMH = Btn.L | Btn.M | Btn.H;
+
+/** 同時按了幾顆攻擊鍵 */
+export function attackCount(bits: InputBits): number {
+  return ((bits & Btn.L) ? 1 : 0) + ((bits & Btn.M) ? 1 : 0) + ((bits & Btn.H) ? 1 : 0);
+}
 
 export function held(bits: InputBits, b: number): boolean {
   return (bits & b) !== 0;

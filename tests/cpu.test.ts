@@ -42,7 +42,7 @@ describe('電腦對手', () => {
           const me = s.fighters[0], foe = s.fighters[1];
           const fwd = foe.x > me.x ? Btn.RIGHT : Btn.LEFT;
           const near = Math.abs(foe.x - me.x) < 150 * FP;
-          const p1 = near ? (k % 30 === 0 ? Btn.HK : 0) : fwd;
+          const p1 = near ? (k % 30 === 0 ? Btn.H : 0) : fwd;
           s.fighters[1].meter = 0; // 只測防禦：不讓電腦放必殺技
           step(s, [p1, cpu.input(s, 1)]);
           const act = s.fighters[1].action;

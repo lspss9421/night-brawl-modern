@@ -82,12 +82,10 @@ export interface MoveDef {
 export interface CommandDef {
   /** 236 = ↓↘→、623 = →↓↘、214 = ↓↙←（以面向為準） */
   motion: '236' | '623' | '214';
-  /** P = 拳、K = 腳 */
-  btn: 'P' | 'K';
   move: string;
-  /** 兩個拳（或兩個腳）一起按 = OD 強化版 */
+  /** 兩顆攻擊鍵一起按 = OD 強化版 */
   od?: string;
-  /** 簡易操作：特殊鍵（n = 單按、f = 前＋特殊、d = 下＋特殊）也能出，但傷害 8 成 */
+  /** 簡易操作：特殊鍵（n = 單按、f = 前＋特殊、d = 下＋特殊）也能出，但傷害 8 成；特殊＋中 = OD */
   sp?: 'n' | 'f' | 'd';
 }
 
@@ -106,11 +104,11 @@ export interface FormStats {
   hurtCrouch: Box;
   hurtAir: Box;
   pushWidth: number; // 像素
-  /** 各按鍵對應的招式 id；缺少代表這個形態沒有該招。 */
+  /** 現代操作：輕／中／重三顆鍵在站、蹲、空中各對應的招式 id；缺少代表這個形態沒有該招。 */
   moves: {
-    sLP?: string; sHP?: string; sLK?: string; sHK?: string;
-    cLP?: string; cHP?: string; cLK?: string; cHK?: string;
-    jLP?: string; jHP?: string; jLK?: string; jHK?: string;
+    sL?: string; sM?: string; sH?: string;
+    cL?: string; cM?: string; cH?: string;
+    jL?: string; jM?: string; jH?: string;
     sp?: string;
   };
   /** 指令技（依序判斷） */

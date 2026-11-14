@@ -10,8 +10,10 @@ const OD_COST = 3 * DRIVE_BAR_UNITS;
 // Mio：一般型，數值都是標準值。特殊技鞭擊距離長；必殺技變身恐龍 10 秒。
 // 數值見 docs/characters/mio/mio.md
 const SPECIALS = ['sp', 'spOD', 'dp', 'dpOD', 'cat', 'catOD', 'super'];
-const LIGHT_CANCEL = ['sHP', 'sHK', 'cHP', 'cHK', ...SPECIALS];
-const HEAVY_CANCEL = SPECIALS;
+// 現代操作的連段：輕 → 中 → 重 → 特殊技／必殺技
+const L_CANCEL = ['sLK', 'sHP', 'cHP', 'cHK', ...SPECIALS];
+const M_CANCEL = ['sHP', 'cHK', ...SPECIALS];
+const H_CANCEL = SPECIALS;
 
 export const mio: CharacterDef = {
   id: 'mio',
@@ -36,15 +38,16 @@ export const mio: CharacterDef = {
       hurtCrouch: { x: -34, y: 0, w: 68, h: 120 },
       hurtAir: { x: -28, y: 20, w: 56, h: 160 },
       pushWidth: 50,
+      // 現代操作：輕／中／重 → 站（輕拳／輕腳／重拳）、蹲（輕腳下段／重拳對空／重腳掃腿）、空中（輕拳／輕腳／重腳）
       moves: {
-        sLP: 'sLP', sHP: 'sHP', sLK: 'sLK', sHK: 'sHK',
-        cLP: 'cLP', cHP: 'cHP', cLK: 'cLK', cHK: 'cHK',
-        jLP: 'jLP', jHP: 'jHP', jLK: 'jLK', jHK: 'jHK', sp: 'sp',
+        sL: 'sLP', sM: 'sLK', sH: 'sHP',
+        cL: 'cLK', cM: 'cHP', cH: 'cHK',
+        jL: 'jLP', jM: 'jLK', jH: 'jHK', sp: 'sp',
       },
       cmds: [
-        { motion: '623', btn: 'P', move: 'dp', od: 'dpOD', sp: 'd' },
-        { motion: '236', btn: 'P', move: 'sp', od: 'spOD', sp: 'n' },
-        { motion: '214', btn: 'K', move: 'cat', od: 'catOD', sp: 'f' },
+        { motion: '623', move: 'dp', od: 'dpOD', sp: 'd' },
+        { motion: '236', move: 'sp', od: 'spOD', sp: 'n' },
+        { motion: '214', move: 'cat', od: 'catOD', sp: 'f' },
       ],
     },
     dino: {
@@ -61,8 +64,9 @@ export const mio: CharacterDef = {
       hurtCrouch: { x: -45, y: 0, w: 90, h: 185 },
       hurtAir: { x: -42, y: 20, w: 84, h: 150 },
       pushWidth: 80,
+      // 奶龍：輕 = 肚子撞、中 = 雙拳重擊、重 = 尾巴橫掃（現代操作版拿掉奶龍拳）
       moves: {
-        sLP: 'dLP', sHP: 'dHP', sLK: 'dLK', sHK: 'dHK',
+        sL: 'dLK', sM: 'dHP', sH: 'dHK',
         sp: 'dBreath',
       },
     },
@@ -72,14 +76,14 @@ export const mio: CharacterDef = {
   moves: {
     ...commonMoves(),
     ...toRecord([
-      move({ id: 'sLP', name: '站輕拳', startup: 4, active: 2, recovery: 7, damage: 30, hitstun: 13, blockstun: 9, hitstop: 6, hitbox: { x: 20, y: 140, w: 70, h: 30 }, cancel: LIGHT_CANCEL }),
-      move({ id: 'sHP', name: '站重拳', startup: 8, active: 3, recovery: 16, damage: 80, hitstun: 20, blockstun: 15, hitstop: 9, pushback: 700, hitbox: { x: 20, y: 120, w: 95, h: 40 }, cancel: HEAVY_CANCEL }),
-      move({ id: 'sLK', name: '站輕腳', startup: 5, active: 3, recovery: 9, damage: 35, hitstun: 13, blockstun: 9, hitstop: 6, hitbox: { x: 15, y: 60, w: 85, h: 30 }, cancel: LIGHT_CANCEL }),
-      move({ id: 'sHK', name: '站重腳', startup: 10, active: 3, recovery: 18, damage: 90, hitstun: 21, blockstun: 15, hitstop: 10, pushback: 800, hitbox: { x: 20, y: 90, w: 115, h: 40 }, cancel: HEAVY_CANCEL }),
-      move({ id: 'cLP', name: '蹲輕拳', stance: 'crouch', startup: 4, active: 2, recovery: 7, damage: 25, hitstun: 12, blockstun: 8, hitstop: 6, hitbox: { x: 20, y: 80, w: 70, h: 30 }, cancel: LIGHT_CANCEL }),
+      move({ id: 'sLP', name: '站輕拳', startup: 4, active: 2, recovery: 7, damage: 30, hitstun: 13, blockstun: 9, hitstop: 6, hitbox: { x: 20, y: 140, w: 70, h: 30 }, cancel: L_CANCEL }),
+      move({ id: 'sHP', name: '站重拳', startup: 8, active: 3, recovery: 16, damage: 80, hitstun: 20, blockstun: 15, hitstop: 9, pushback: 700, hitbox: { x: 20, y: 120, w: 95, h: 40 }, cancel: H_CANCEL }),
+      move({ id: 'sLK', name: '站輕腳', startup: 5, active: 3, recovery: 9, damage: 35, hitstun: 13, blockstun: 9, hitstop: 6, hitbox: { x: 15, y: 60, w: 85, h: 30 }, cancel: M_CANCEL }),
+      move({ id: 'sHK', name: '站重腳', startup: 10, active: 3, recovery: 18, damage: 90, hitstun: 21, blockstun: 15, hitstop: 10, pushback: 800, hitbox: { x: 20, y: 90, w: 115, h: 40 }, cancel: H_CANCEL }),
+      move({ id: 'cLP', name: '蹲輕拳', stance: 'crouch', startup: 4, active: 2, recovery: 7, damage: 25, hitstun: 12, blockstun: 8, hitstop: 6, hitbox: { x: 20, y: 80, w: 70, h: 30 }, cancel: L_CANCEL }),
       move({ id: 'cHP', name: '蹲重拳（對空）', stance: 'crouch', startup: 7, active: 4, recovery: 18, damage: 75, hitstun: 20, blockstun: 14, hitstop: 9, knockdown: true, launch: { vx: 250, vy: 1600 }, // 從蹲姿身體前緣上方往前打（打對手臉的高度，也能對空）
-        codeHitbox: true, hitbox: { x: 45, y: 150, w: 80, h: 115 }, cancel: HEAVY_CANCEL }),
-      move({ id: 'cLK', name: '蹲輕腳', stance: 'crouch', guard: 'low', startup: 5, active: 2, recovery: 9, damage: 25, hitstun: 12, blockstun: 8, hitstop: 6, hitbox: { x: 15, y: 0, w: 90, h: 30 }, cancel: LIGHT_CANCEL }),
+        codeHitbox: true, hitbox: { x: 45, y: 150, w: 80, h: 115 }, cancel: M_CANCEL }),
+      move({ id: 'cLK', name: '蹲輕腳', stance: 'crouch', guard: 'low', startup: 5, active: 2, recovery: 9, damage: 25, hitstun: 12, blockstun: 8, hitstop: 6, hitbox: { x: 15, y: 0, w: 90, h: 30 }, cancel: L_CANCEL }),
       move({ id: 'cHK', name: '蹲重腳（掃腿）', stance: 'crouch', guard: 'low', startup: 9, active: 3, recovery: 22, damage: 80, hitstun: 20, blockstun: 14, hitstop: 9, knockdown: true, hitbox: { x: 15, y: 0, w: 125, h: 30 } }),
       move({ id: 'jLP', name: '空中輕拳', stance: 'air', guard: 'high', startup: 5, active: 5, recovery: 5, damage: 40, hitstun: 16, blockstun: 11, hitstop: 6, hitbox: { x: 15, y: 70, w: 65, h: 35 } }),
       move({ id: 'jHP', name: '空中重拳', stance: 'air', guard: 'high', startup: 10, active: 5, recovery: 16, damage: 80, hitstun: 19, blockstun: 13, hitstop: 8, hitbox: { x: 10, y: 20, w: 85, h: 60 } }),
@@ -134,7 +138,6 @@ export const mio: CharacterDef = {
       // 挑釁：轉身搖尾巴兩輪，動畫比共用的長（130 格）
       move({ id: 'taunt', name: '挑釁', kind: 'taunt', startup: 0, active: 0, recovery: 130 }),
       // 恐龍形態（奶龍）：輕重拳腳各不同，特殊技是龍之吐息
-      move({ id: 'dLP', name: '奶龍拳', startup: 6, active: 3, recovery: 10, damage: 40, hitstun: 14, blockstun: 10, hitstop: 7, hitbox: { x: 30, y: 110, w: 80, h: 40 }, cancel: ['dHP', 'dLK', 'dHK', 'dBreath'] }),
       move({ id: 'dHP', name: '雙拳重擊', startup: 17, active: 5, recovery: 26, damage: 95, hitstun: 22, blockstun: 16, hitstop: 12, pushback: 1000, hitbox: { x: 30, y: 60, w: 100, h: 140 }, cancel: ['dBreath'] }),
       move({ id: 'dLK', name: '肚子撞', startup: 9, active: 4, recovery: 14, damage: 60, hitstun: 18, blockstun: 12, hitstop: 9, pushback: 900, advance: 300, hitbox: { x: 30, y: 30, w: 90, h: 110 }, cancel: ['dHP', 'dHK', 'dBreath'] }),
       move({ id: 'dHK', name: '尾巴橫掃', startup: 18, active: 5, recovery: 28, damage: 85, hitstun: 20, blockstun: 15, hitstop: 10, pushback: 900, knockdown: true,

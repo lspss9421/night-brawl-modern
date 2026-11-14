@@ -69,7 +69,7 @@ describe('實際的 Sawa 素材', () => {
       while (s.phase !== 'fight') step(s, [0, 0]);
       s.fighters[0].x = 600 * FP;
       s.fighters[1].x = 680 * FP;
-      step(s, [Btn.LP, 0]);
+      step(s, [Btn.L, 0]);
       for (let k = 0; k < 30; k++) step(s, [0, 0]);
       let x = 7;
       for (let k = 0; k < 2000; k++) { x = (x * 1103515245 + 12345) & 0x7fffffff; step(s, [x & 0x3ff, (x >> 10) & 0x3ff]); }
@@ -86,7 +86,7 @@ describe('實際的 Sawa 素材', () => {
     s.fighters[0].x = 600 * FP;
     s.fighters[1].x = 680 * FP;
     step(s, [0, 0]);
-    step(s, [Btn.LP, 0]);
+    step(s, [Btn.L, 0]);
     for (let k = 0; k < 20; k++) step(s, [0, 0]);
     expect(s.fighters[1].hp).toBe(1000 - 25);
   });
