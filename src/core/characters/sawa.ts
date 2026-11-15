@@ -8,7 +8,7 @@ const SP_COST = 2 * DRIVE_BAR_UNITS;
 const OD_COST = 3 * DRIVE_BAR_UNITS;
 
 // 佐波 Sawa：速度型。出招快、移動快、距離短、血少。數值見 docs/characters/sawa/sawa.md
-const SPECIALS = ['sp', 'spOD', 'dp', 'dpOD', 'rush', 'rushOD', 'super'];
+const SPECIALS = ['sp', 'spOD', 'dp', 'dpOD', 'scream', 'screamOD', 'selfie', 'selfieOD', 'super'];
 // 現代操作的連段：輕 → 中 → 重 → 特殊技／必殺技
 const L_CANCEL = ['sLK', 'sHP', 'cHP', 'cHK', ...SPECIALS];
 const M_CANCEL = ['sHP', 'cHK', ...SPECIALS];
@@ -44,10 +44,12 @@ export const sawa: CharacterDef = {
         jL: 'jLP', jM: 'jLK', jH: 'jHK', sp: 'sp',
       },
       cmds: [
-        { motion: '623', move: 'dp', od: 'dpOD', sp: 'd' },
-        // ↓↘→ + 輕 = 舞步旋踢；↓↘→ + 中／重 = 愛心波動（兩顆鍵一起按：有輕 = 旋踢 OD、中＋重 = 愛心波動 OD）
-        { motion: '236', btn: 'L', move: 'rush', od: 'rushOD', sp: 'f' },
-        { motion: '236', move: 'sp', od: 'spOD', sp: 'n' },
+        // ↓↘→ + 輕 = 星光上勾拳、+ 中 = 麥克風尖叫、+ 重 = 自拍閃光（兩顆攻擊鍵 = 較輕那顆的 OD）
+        // 愛心波動只能按特殊鍵（特殊＋中 = OD）；特殊＋↓ = 上勾拳、特殊＋→ = 麥克風尖叫（簡易操作 8 成）
+        { motion: '236', btn: 'L', move: 'dp', od: 'dpOD', sp: 'd' },
+        { motion: '236', btn: 'M', move: 'scream', od: 'screamOD', sp: 'f' },
+        { motion: '236', btn: 'H', move: 'selfie', od: 'selfieOD' },
+        { move: 'sp', od: 'spOD', sp: 'n', spOnly: true },
       ],
     },
   },
@@ -81,7 +83,7 @@ export const sawa: CharacterDef = {
         projectile: { spawnFrame: 11, speed: 1300, box: { x: -28, y: -28, w: 56, h: 56 }, spawnX: 60, spawnY: 125 },
       }),
       move({
-        // →↓↘ + 拳：往上打的對空技（打中把對手打飛）；同一隻手蓄力再往上揮，拳頭旁冒愛心。打中時畫面慢動作
+        // ↓↘→ + 輕：往上打的對空技（打中把對手打飛）；同一隻手蓄力再往上揮，拳頭旁冒愛心。打中時畫面慢動作
         id: 'dp', name: '星光上勾拳', kind: 'special', driveCost: SP_COST, startup: 7, active: 6, recovery: 38,
         damage: 90, hitstun: 20, blockstun: 12, hitstop: 9, pushback: 500, knockdown: true, launch: { vx: 300, vy: 1900 }, invuln: 4,
         hitbox: { x: 45, y: 90, w: 75, h: 180 }, slowmo: 30,
@@ -94,19 +96,28 @@ export const sawa: CharacterDef = {
         hitbox: { x: 45, y: 90, w: 80, h: 190 }, slowmo: 30,
       }),
       move({
-        // ↓↘→ + 輕：像芭蕾舞一樣踮腳旋轉三圈、腿伸直掃出去，每圈踢一下（三段），被防 -4。
-        // 動畫：踮腳準備 →（腿朝對手時踢中：第 16、28、40 格）→ 腿放下，共 61 格
-        id: 'rush', name: '舞步旋踢', kind: 'special', driveCost: SP_COST, startup: 15, active: 27, recovery: 19,
-        damage: 30, hitstun: 18, blockstun: 14, hitstop: 7, pushback: 250, advance: 350,
-        multiHit: { count: 3, interval: 12 },
-        hitbox: { x: 15, y: 70, w: 100, h: 50 },
+        // ↓↘→ + 中：麥克風尖叫 —— 對著愛心麥克風大喊，前方炸出音波把人推開，音波還能抵銷對手的飛行道具
+        id: 'scream', name: '麥克風尖叫', kind: 'special', slowmo: 30, driveCost: SP_COST, startup: 14, active: 10, recovery: 22,
+        damage: 70, hitstun: 18, blockstun: 14, hitstop: 8, pushback: 1600, eatsProjectiles: true,
+        codeHitbox: true, hitbox: { x: 40, y: 60, w: 240, h: 140 }, // 音波打到身前約 40～280（畫面上另外畫往外擴散的音波圈）
       }),
       move({
-        // OD：一樣三圈，傷害高、最後一下踢倒
-        id: 'rushOD', name: '舞步旋踢 OD', kind: 'special', od: true, anim: 'rush', startup: 15, active: 27, recovery: 19,
-        damage: 40, hitstun: 20, blockstun: 14, hitstop: 8, pushback: 250, advance: 450, knockdown: true,
-        multiHit: { count: 3, interval: 12 }, driveCost: OD_COST,
-        hitbox: { x: 15, y: 70, w: 105, h: 50 },
+        // OD：出得更快、音波更大，打中把人震倒
+        id: 'screamOD', name: '麥克風尖叫 OD', kind: 'special', slowmo: 30, od: true, driveCost: OD_COST, anim: 'scream', startup: 10, active: 12, recovery: 20,
+        damage: 100, hitstun: 20, blockstun: 16, hitstop: 9, pushback: 1800, knockdown: true, eatsProjectiles: true,
+        codeHitbox: true, hitbox: { x: 40, y: 50, w: 280, h: 160 },
+      }),
+      move({
+        // ↓↘→ + 重：自拍閃光 —— 湊到對手旁邊自拍，閃光燈把對手閃到頭暈（約 1.3 秒不能動，可以接連段）；看照片、秀照片的收招比較長，沒閃到破綻很大
+        id: 'selfie', name: '自拍閃光', kind: 'special', slowmo: 40, driveCost: SP_COST, startup: 14, active: 3, recovery: 48,
+        damage: 30, hitstun: 80, blockstun: 10, hitstop: 12, pushback: 100, dizzyHit: true, whiffRecovery: 14, // 沒閃到：14 格就收招，不看照片
+        codeHitbox: true, hitbox: { x: 10, y: 80, w: 100, h: 120 },
+      }),
+      move({
+        // OD：出得更快、暈更久
+        id: 'selfieOD', name: '自拍閃光 OD', kind: 'special', slowmo: 40, od: true, driveCost: OD_COST, anim: 'selfie', startup: 10, active: 4, recovery: 44,
+        damage: 40, hitstun: 100, blockstun: 12, hitstop: 14, pushback: 100, dizzyHit: true, whiffRecovery: 12,
+        codeHitbox: true, hitbox: { x: 10, y: 80, w: 110, h: 120 },
       }),
       move({
         // 聚光燈打在 Sawa 身上 → 拿起麥克風開唱（發生 30 格是燈光亮起的時間）

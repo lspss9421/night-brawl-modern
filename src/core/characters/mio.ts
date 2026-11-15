@@ -9,7 +9,7 @@ const OD_COST = 3 * DRIVE_BAR_UNITS;
 
 // Mio：一般型，數值都是標準值。特殊技鞭擊距離長；必殺技變身恐龍 10 秒。
 // 數值見 docs/characters/mio/mio.md
-const SPECIALS = ['sp', 'spOD', 'dp', 'dpOD', 'cat', 'catOD', 'super'];
+const SPECIALS = ['sp', 'spOD', 'bubble', 'bubbleOD', 'pillow', 'pillowOD', 'cat', 'catOD', 'super'];
 // 現代操作的連段：輕 → 中 → 重 → 特殊技／必殺技
 const L_CANCEL = ['sLK', 'sHP', 'cHP', 'cHK', ...SPECIALS];
 const M_CANCEL = ['sHP', 'cHK', ...SPECIALS];
@@ -45,10 +45,12 @@ export const mio: CharacterDef = {
         jL: 'jLP', jM: 'jLK', jH: 'jHK', sp: 'sp',
       },
       cmds: [
-        { motion: '623', move: 'dp', od: 'dpOD', sp: 'd' },
-        // ↓↘→ + 輕 = 貓咪突擊；↓↘→ + 中／重 = 鞭擊（兩顆鍵一起按：有輕 = 貓咪 OD、中＋重 = 鞭擊 OD）
+        // ↓↘→ + 輕 = 紫米突襲、+ 中 = 瞌睡泡泡、+ 重 = 枕頭飛撲（兩顆攻擊鍵 = 較輕那顆的 OD）
+        // 鞭擊只能按特殊鍵（特殊＋中 = OD）；特殊＋↓ = 瞌睡泡泡、特殊＋→ = 紫米突襲（簡易操作 8 成）
         { motion: '236', btn: 'L', move: 'cat', od: 'catOD', sp: 'f' },
-        { motion: '236', move: 'sp', od: 'spOD', sp: 'n' },
+        { motion: '236', btn: 'M', move: 'bubble', od: 'bubbleOD', sp: 'd' },
+        { motion: '236', btn: 'H', move: 'pillow', od: 'pillowOD' },
+        { move: 'sp', od: 'spOD', sp: 'n', spOnly: true },
       ],
     },
     dino: {
@@ -104,21 +106,36 @@ export const mio: CharacterDef = {
         codeHitbox: true, hitbox: { x: 40, y: 110, w: 290, h: 40 },
       }),
       move({
-        // →↓↘ + 拳：往上甩鞭的對空技
-        id: 'dp', name: '昇天鞭', kind: 'special', driveCost: SP_COST, anim: 'cHP', startup: 6, active: 6, recovery: 30,
-        damage: 95, hitstun: 20, blockstun: 12, hitstop: 9, pushback: 500, knockdown: true, launch: { vx: 300, vy: 1900 }, invuln: 4,
-        hitbox: { x: 10, y: 100, w: 115, h: 190 },
+        // ↓↘→ + 中：瞌睡泡泡 —— 站著打瞌睡，鼻子吹出一顆大鼻涕泡泡，脫離鼻子後慢慢往斜上方飄，碰到人就爆開把人彈飛。
+        // 預判型對空：先放在空中封住對手跳進來的路線（沒有無敵）；飄完沒碰到人就消失
+        id: 'bubble', name: '瞌睡泡泡', kind: 'special', slowmo: 30, driveCost: SP_COST, startup: 16, active: 1, recovery: 24,
+        damage: 80, hitstun: 22, blockstun: 14, hitstop: 9, pushback: 400, knockdown: true, launch: { vx: 300, vy: 1700 },
+        projectile: { spawnFrame: 16, speed: 260, rise: 160, box: { x: -40, y: -40, w: 80, h: 80 }, spawnX: 34, spawnY: 141, life: 100, endPuff: true }, // 第 16 格泡泡從鼻子脫離：位置和動畫第 5 格鼻子上那顆泡泡一樣
       }),
       move({
-        // OD：出招到攻擊結束全程無敵
-        id: 'dpOD', name: '昇天鞭 OD', kind: 'special', od: true, anim: 'cHP', startup: 6, active: 8, recovery: 32,
-        damage: 70, hitstun: 20, blockstun: 12, hitstop: 8, pushback: 500, knockdown: true, launch: { vx: 300, vy: 2100 }, invuln: 14,
-        multiHit: { count: 2, interval: 4 }, driveCost: OD_COST,
-        hitbox: { x: 10, y: 100, w: 120, h: 200 },
+        // OD：泡泡更大、吐得更快、飄得更快，爆開更痛
+        id: 'bubbleOD', name: '瞌睡泡泡 OD', kind: 'special', slowmo: 30, od: true, driveCost: OD_COST, anim: 'bubble', startup: 12, active: 1, recovery: 22,
+        damage: 110, hitstun: 24, blockstun: 16, hitstop: 10, pushback: 450, knockdown: true, launch: { vx: 300, vy: 1900 },
+        projectile: { spawnFrame: 12, speed: 320, rise: 200, box: { x: -50, y: -50, w: 100, h: 100 }, spawnX: 34, spawnY: 141, life: 100, endPuff: true },
       }),
       move({
-        // ↓↘→ + 輕：召喚貓咪 → 用手指向對手 → 貓咪飛撲過去，撲到臉上連抓三下後消失；被防或沒撲到就消失
-        id: 'cat', name: '貓咪突擊', kind: 'special', driveCost: SP_COST, startup: 16, active: 1, recovery: 26,
+        // ↓↘→ + 重：枕頭飛撲 —— 從衣服裡抽出大枕頭、雙手舉高，往前長距離跳過去，落下時把枕頭砸下去。
+        // 突進用：第 12 格起跳、往前飛約 340 像素，落下時打（上段：蹲著擋不住），人在空中時投技抓不到
+        id: 'pillow', name: '枕頭飛撲', kind: 'special', slowmo: 30, driveCost: SP_COST, startup: 26, active: 5, recovery: 18,
+        damage: 90, hitstun: 22, blockstun: 12, hitstop: 10, pushback: 500, guard: 'high',
+        advance: 1700, advanceFrom: 12, airborne: [12, 28],
+        codeHitbox: true, hitbox: { x: 20, y: 0, w: 95, h: 130 },
+      }),
+      move({
+        // OD：起跳更快、飛更遠，砸下去會把人打倒
+        id: 'pillowOD', name: '枕頭飛撲 OD', kind: 'special', slowmo: 30, od: true, driveCost: OD_COST, anim: 'pillow', startup: 22, active: 5, recovery: 18,
+        damage: 120, hitstun: 22, blockstun: 14, hitstop: 11, pushback: 500, guard: 'high', knockdown: true,
+        advance: 2000, advanceFrom: 10, airborne: [10, 24],
+        codeHitbox: true, hitbox: { x: 20, y: 0, w: 100, h: 130 },
+      }),
+      move({
+        // ↓↘→ + 輕：紫米突襲 —— 召喚貓咪（紫米） → 用手指向對手 → 貓咪飛撲過去，撲到臉上連抓三下後消失；被防或沒撲到就消失
+        id: 'cat', name: '紫米突襲', kind: 'special', slowmo: 16, driveCost: SP_COST, startup: 16, active: 1, recovery: 26,
         damage: 25, hitstun: 20, blockstun: 14, hitstop: 6, pushback: 150,
         // 第 7 格貓咪出現在腳邊（舉手召喚），第 16 格 Mio 指向對手時飛撲出去
         projectile: { spawnFrame: 16, speed: 1100, box: { x: -30, y: -25, w: 60, h: 50 }, spawnX: 50, spawnY: 130, life: 36, summon: { frame: 7, x: 75, y: 39 } },
@@ -126,7 +143,7 @@ export const mio: CharacterDef = {
       }),
       move({
         // OD：貓咪飛得快、飛得遠，每下抓比較痛，最後一下抓倒
-        id: 'catOD', name: '貓咪突擊 OD', kind: 'special', od: true, driveCost: OD_COST, anim: 'cat', startup: 14, active: 1, recovery: 24,
+        id: 'catOD', name: '紫米突襲 OD', kind: 'special', slowmo: 16, od: true, driveCost: OD_COST, anim: 'cat', startup: 14, active: 1, recovery: 24,
         damage: 35, hitstun: 22, blockstun: 16, hitstop: 7, pushback: 150, knockdown: true,
         projectile: { spawnFrame: 14, speed: 1500, box: { x: -30, y: -25, w: 60, h: 50 }, spawnX: 50, spawnY: 130, life: 40, summon: { frame: 6, x: 75, y: 39 } },
         latch: { hits: 3, interval: 12 },

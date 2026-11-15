@@ -22,6 +22,10 @@ export interface ProjectileDef {
   spawnY: number;
   /** 飛多少格後消失（沒設定 = 300） */
   life?: number;
+  /** 每格往上飄多少（centi-px），例如瞌睡泡泡 */
+  rise?: number;
+  /** 時間到消失時冒一團煙 */
+  endPuff?: boolean;
   /** 召喚物：第幾格先出現在腳邊等著（到 spawnFrame 才飛出去）；出現的位置（像素，相對角色） */
   summon?: { frame: number; x: number; y: number };
 }
@@ -58,6 +62,10 @@ export interface MoveDef {
   invuln?: number;
   /** 發生到持續期間每格向前移動（centi-px）。 */
   advance?: number;
+  /** 從第幾格才開始往前移動（例如先拿出枕頭再跳） */
+  advanceFrom?: number;
+  /** 第幾格到第幾格人在空中（動畫裡跳起來）：投技抓不到、被打中會被打飛 */
+  airborne?: [number, number];
   /** 必殺技畫面暫停的影格數。 */
   superFreeze?: number;
   /** 擊飛：命中時把對手往上打飛（centi-px / 格）；需搭配 knockdown */
@@ -74,14 +82,21 @@ export interface MoveDef {
   od?: boolean;
   /** 召喚物撲到對手身上：打中後黏在對手臉上連抓 hits 下（每 interval 格一下），抓完消失；被防或沒打中就消失 */
   latch?: { hits: number; interval: number };
+  /** 攻擊範圍可以抵銷對手的飛行道具（例如麥克風尖叫的音波） */
+  eatsProjectiles?: boolean;
+  /** 沒打中（揮空或被防）時，攻擊結束後只剩這麼多格收招，後面的動畫直接取消（例如自拍閃光沒閃到就不看照片） */
+  whiffRecovery?: number;
+  /** 打中時對手頭上轉星星（頭暈；暈多久就是 hitstun） */
+  dizzyHit?: boolean;
   /** 打中時畫面慢動作幾格（畫面影格數；慢動作期間遊戲 1/3 速度） */
   slowmo?: number;
 }
 
 /** 指令技：搓招 + 拳／腳 */
 export interface CommandDef {
-  /** 236 = ↓↘→、623 = →↓↘、214 = ↓↙←（以面向為準） */
-  motion: '236' | '623' | '214';
+  /** 262 = ↓→↓、236 = ↓↘→、623 = →↓↘、214 = ↓↙←（以面向為準） */
+  /** 沒設定 = 不能搓招，只能用特殊鍵出（見 spOnly） */
+  motion?: '262' | '236' | '623' | '214';
   /** 只有按這顆攻擊鍵才出（沒設定 = 輕中重任一顆） */
   btn?: 'L' | 'M' | 'H';
   move: string;
@@ -89,6 +104,8 @@ export interface CommandDef {
   od?: string;
   /** 簡易操作：特殊鍵（n = 單按、f = 前＋特殊、d = 下＋特殊）也能出，但傷害 8 成；特殊＋中 = OD */
   sp?: 'n' | 'f' | 'd';
+  /** 只能用特殊鍵出的招（全傷害；特殊＋中 = OD） */
+  spOnly?: boolean;
 }
 
 export interface FormStats {
@@ -225,6 +242,8 @@ export interface FighterState {
   armorUsed: number;
   /** 撞牆／暈眩中：倒下前不會被推離牆邊 */
   wallSplat: boolean;
+  /** 這招有沒有真的打中（不算被防）；whiffRecovery 用 */
+  hitLanded: boolean;
   /** 這次倒地是跪倒後倒下的（倒地動畫沿用跪倒的最後一格，不再重播往後摔） */
   afterCrumple: boolean;
 }
@@ -244,13 +263,15 @@ export interface Projectile {
   wait?: number;
   /** 飛出去後要飛到的高度（centi-px） */
   targetY?: number;
+  /** 每格往上飄多少（centi-px） */
+  vy?: number;
 }
 
 export interface Spark {
   x: number;
   y: number;
   timer: number;
-  kind: 'hit' | 'block' | 'puff' | 'parry' | 'perfect' | 'reversal' | 'tech' | 'burnout' | 'counter' | 'punish' | 'armor' | 'impact' | 'wall' | 'rush' | 'dizzy' | 'od';
+  kind: 'hit' | 'block' | 'puff' | 'parry' | 'perfect' | 'reversal' | 'tech' | 'burnout' | 'counter' | 'punish' | 'armor' | 'impact' | 'wall' | 'rush' | 'dizzy' | 'od' | 'bpop';
 }
 
 export type Phase = 'intro' | 'fight' | 'ko' | 'matchEnd';

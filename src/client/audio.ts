@@ -42,17 +42,25 @@ class AudioSystem {
     const unlock = () => this.ensure();
     window.addEventListener('pointerdown', unlock);
     window.addEventListener('keydown', unlock);
-    // 切到別的分頁（或縮小視窗）時整個暫停，回來再接著播
-    document.addEventListener('visibilitychange', () => {
+    // 遊戲畫面不在最前面時（切到別的分頁、別的應用程式、縮小視窗）整個暫停，回來再接著播
+    const sync = () => {
       if (!this.ctx) return;
-      if (document.hidden) void this.ctx.suspend();
-      else void this.ctx.resume();
-    });
+      if (this.active()) void this.ctx.resume();
+      else void this.ctx.suspend();
+    };
+    document.addEventListener('visibilitychange', sync);
+    window.addEventListener('blur', sync);
+    window.addEventListener('focus', sync);
+  }
+
+  /** 遊戲頁面是否正在畫面最前面（看得到而且是目前使用中的視窗） */
+  private active(): boolean {
+    return !document.hidden && document.hasFocus();
   }
 
   private ensure(): AudioContext | null {
     if (this.ctx) {
-      if (this.ctx.state === 'suspended' && !document.hidden) void this.ctx.resume();
+      if (this.ctx.state === 'suspended' && this.active()) void this.ctx.resume();
       return this.ctx;
     }
     // 使用者還沒點過頁面時瀏覽器不允許出聲：先不建立，等第一次點擊／按鍵
@@ -173,7 +181,7 @@ class AudioSystem {
   }
 
   play(name: SfxName): void {
-    if (!this.ensure() || this.settings.sfx <= 0) return;
+    if (!this.active() || !this.ensure() || this.settings.sfx <= 0) return; // 不在畫面最前面時不播（回來時才不會一次全部冒出來）
     const sample = this.samples[name];
     const voice = name === 'mio_select' || name === 'mio_super' || name === 'sawa_super';
     if (sample) { this.playSample(sample, SAMPLE_VOL[name] ?? 1, voice); return; }

@@ -20,12 +20,17 @@ function editorSavePlugin(): Plugin {
         // 預告片錄製（trailer.html）：/__editor/save-frame/<片段>/<檔名> → art/trailer/frames/<片段>/
         const fr = req.url?.match(/^\/__editor\/save-frame\/([a-z0-9_-]{1,32})\/([a-z0-9_-]{1,32}\.(?:jpg|json))$/);
         if (fr && req.method === 'POST') {
-          const chunks: Buffer[] = [];
-          for await (const chunk of req) chunks.push(chunk as Buffer);
-          const dir = resolve(ROOT, 'art/trailer/frames', fr[1]);
-          await mkdir(dir, { recursive: true });
-          await writeFile(resolve(dir, fr[2]), Buffer.concat(chunks));
-          res.end('ok');
+          // 頁面重新整理時上傳可能被中斷：接住錯誤，不要讓整個開發伺服器當掉
+          try {
+            const chunks: Buffer[] = [];
+            for await (const chunk of req) chunks.push(chunk as Buffer);
+            const dir = resolve(ROOT, 'art/trailer/frames', fr[1]);
+            await mkdir(dir, { recursive: true });
+            await writeFile(resolve(dir, fr[2]), Buffer.concat(chunks));
+            res.end('ok');
+          } catch {
+            if (!res.writableEnded) { res.statusCode = 400; res.end('aborted'); }
+          }
           return;
         }
         const m = ui ? null : req.url?.match(/^\/__editor\/save\/([a-z0-9_-]{1,32})\/(sheet\.png|data\.json)$/);

@@ -69,10 +69,13 @@ function updateSelect(): void {
   }
   if (kb.consume('F2')) {
     p2Mode = DUMMY_ORDER[(DUMMY_ORDER.indexOf(p2Mode) + 1) % DUMMY_ORDER.length];
-    if (p2Mode !== 'human') ready[1] = true;
+    if (p2Mode !== 'human') {
+      ready[1] = true;
+      if (cursor[1] >= CHARACTER_IDS.length) cursor[1] = Math.min(1, CHARACTER_IDS.length - 1); // 電腦不能停在「即將登場」
+    }
     else ready[1] = false;
   }
-  const n = CHARACTER_IDS.length;
+  const n = CHARACTER_IDS.length + 1; // 多一格「？ 即將登場」，可以移過去但不能確定
   // 左右選擇用各自設定的按鍵；Enter 確定（先 P1、再 P2）；輕攻擊取消
   if (!ready[0]) {
     if (kb.consumeAny(P1_KEYS.LEFT)) { cursor[0] = (cursor[0] + n - 1) % n; audio.play('menu'); }
@@ -80,14 +83,17 @@ function updateSelect(): void {
   } else if (kb.consumeAny(P1_KEYS.L)) ready[0] = false;
   // 電腦／假人模式時由 P1 一起幫 P2 選角（上／下切換）
   if (p2Mode !== 'human') {
-    if (kb.consumeAny(P1_KEYS.UP) || kb.consumeAny(P1_KEYS.DOWN)) { cursor[1] = (cursor[1] + 1) % n; audio.play('menu'); }
+    if (kb.consumeAny(P1_KEYS.UP) || kb.consumeAny(P1_KEYS.DOWN)) { cursor[1] = (cursor[1] + 1) % CHARACTER_IDS.length; audio.play('menu'); }
   } else if (!ready[1]) {
     if (kb.consumeAny(P2_KEYS.LEFT)) { cursor[1] = (cursor[1] + n - 1) % n; audio.play('menu'); }
     if (kb.consumeAny(P2_KEYS.RIGHT)) { cursor[1] = (cursor[1] + 1) % n; audio.play('menu'); }
   } else if (kb.consumeAny(P2_KEYS.L)) ready[1] = false;
   if (kb.consume('Enter')) {
-    if (!ready[0]) lockIn(0);
-    else if (p2Mode === 'human' && !ready[1]) lockIn(1);
+    const p: 0 | 1 | null = !ready[0] ? 0 : p2Mode === 'human' && !ready[1] ? 1 : null;
+    if (p !== null) {
+      if (cursor[p] < CHARACTER_IDS.length) lockIn(p);
+      else audio.play('menu'); // 即將登場的角色還不能選
+    }
   }
 
   if (ready[0] && ready[1] && assetsReady) countdown = LOCK_COUNTDOWN;
@@ -122,6 +128,8 @@ const STEP_MS = 1000 / 60;
 let last = performance.now();
 let acc = 0;
 
+const helpEl = document.getElementById('help')!;
+
 function frame(now: number): void {
   acc += Math.min(250, now - last);
   last = now;
@@ -138,6 +146,8 @@ function frame(now: number): void {
   else if (screen === 'online') online?.draw(renderer, showBoxes);
   else if (screen === 'select') renderer.drawSelect(CHARACTER_IDS, cursor, ready, `玩家 2 模式：${DUMMY_LABEL[p2Mode]}`, selectHint(), undefined, countdown / 60);
   else if (game) renderer.draw(game, { showBoxes, p2Label: p2Mode === 'human' ? '' : DUMMY_LABEL[p2Mode] });
+  // P2 的按鍵說明只在「雙人對戰（同一台電腦）」而且玩家 2 是真人時顯示
+  helpEl.classList.toggle('two-player', (screen === 'select' || screen === 'fight') && p2Mode === 'human');
   // 背景音樂：對戰中播緊張的對戰音樂，主選單、選角、連線等待播輕快的主選單音樂
   const inMatch = screen === 'fight' || (screen === 'online' && online?.status === 'match');
   audio.setBgm(bgmPreview !== null ? 'battle' : inMatch ? 'battle' : 'menu');
@@ -258,17 +268,42 @@ if (roomFromUrl) {
   void assetsPromise.then(() => startOnline('join', roomFromUrl.toUpperCase()));
 }
 
-// ───── 操作說明（依目前的按鍵配置產生） ─────
+// ───── 操作說明（依目前的按鍵配置產生）：整理成一排卡片 ─────
 function renderHelp(): void {
-  const k = (p: 1 | 2, a: Action) => `<kbd>${keysOf(p, a)}</kbd>`;
-  const line = (p: 1 | 2) =>
-    `<b>P${p}</b> ${k(p, 'UP')}${k(p, 'LEFT')}${k(p, 'DOWN')}${k(p, 'RIGHT')} 移動 · ${k(p, 'L')}/${k(p, 'M')}/${k(p, 'H')} 輕/中/重 · ` +
-    `${k(p, 'SP')} 特殊（加↓／加前換招，加中 = OD，傷害 8 成） · ${k(p, 'SP')}+${k(p, 'H')} 必殺 · ${k(p, 'L')}+${k(p, 'M')} 投技 · ${k(p, 'DRIVE')} 鬥氣 · ${k(p, 'TAUNT')} 挑釁`;
-  $('help').innerHTML = `${line(1)}<br />${line(2)}<br />` +
-    '指令技：↓↘→、→↓↘、↓↙← ＋任一攻擊鍵（扣 2 格鬥氣；兩顆攻擊鍵一起按 = OD 強化版，扣 3 格） · ' +
-    '前＋鬥氣 = 鬥氣衝擊（霸體，牆邊打中會撞牆） · 普通技打中後按鬥氣、檔架中連按兩下前 = 鬥氣衝刺 · ' +
-    '按住「後」防禦、蹲著按住後 = 蹲防 · 按住鬥氣 = 檔架 · 防禦中按鬥氣 = 鬥氣反擊 · 被抓時按投技 = 拆投 · 連按兩下前/後 = 衝刺/後撤 · ' +
-    (import.meta.env.DEV ? '<kbd>F1</kbd> 判定框 · ' : '') + '<kbd>F2</kbd> 切換玩家 2／電腦（簡單・普通・困難）／假人 · <kbd>Esc</kbd> 返回';
+  const kb1 = (p: 1 | 2, a: Action) => `<kbd>${keysOf(p, a).split('／')[0]}</kbd>`; // 有好幾個鍵時只顯示第一個
+  const g = (name: string) => `<kbd class="g">${name}</kbd>`; // 通用按鍵名稱（輕／中／重／特殊／鬥氣）
+  const row = (label: string, keys: string) => `<dt>${label}</dt><dd>${keys}</dd>`;
+  const card = (title: string, rows: string, cls = '') => `<section class="card ${cls}"><h4>${title}</h4><dl>${rows}</dl></section>`;
+  const player = (p: 1 | 2) => card(`P${p} 按鍵`,
+    row('移動', `${kb1(p, 'UP')}${kb1(p, 'LEFT')}${kb1(p, 'DOWN')}${kb1(p, 'RIGHT')}`) +
+    row('輕／中／重', `${kb1(p, 'L')}${kb1(p, 'M')}${kb1(p, 'H')}`) +
+    row('特殊', kb1(p, 'SP')) +
+    row('鬥氣', kb1(p, 'DRIVE')) +
+    row('挑釁', kb1(p, 'TAUNT')), `p${p}`);
+  $('help').innerHTML =
+    player(1) + player(2) +
+    card('基本',
+      row('防禦', '按住後（蹲防：↙）') +
+      row('衝刺／後撤', '→→ ／ ←←') +
+      row('投技', `${g('輕')}+${g('中')}`) +
+      row('必殺技', `${g('特殊')}+${g('重')}`) +
+      row('OD 強化', `兩顆攻擊鍵（特殊技：${g('特殊')}+${g('中')}）`)) +
+    card('鬥氣',
+      row('檔架', `按住 ${g('鬥氣')}`) +
+      row('鬥氣衝擊', `→+${g('鬥氣')}`) +
+      row('鬥氣反擊', `防禦中按 ${g('鬥氣')}`) +
+      row('鬥氣衝刺', `打中後按 ${g('鬥氣')}／檔架中 →→`)) +
+    card('Sawa',
+      row('愛心波動', g('特殊')) +
+      row('星光上勾拳', `↓↘→+${g('輕')}`) +
+      row('麥克風尖叫', `↓↘→+${g('中')}`) +
+      row('自拍閃光', `↓↘→+${g('重')}`), 'sawa') +
+    card('Mio',
+      row('鞭擊', g('特殊')) +
+      row('紫米突襲', `↓↘→+${g('輕')}`) +
+      row('瞌睡泡泡', `↓↘→+${g('中')}`) +
+      row('枕頭飛撲', `↓↘→+${g('重')}`), 'mio') +
+    `<div class="foot">${import.meta.env.DEV ? '<kbd>F1</kbd> 判定框　' : ''}<kbd>F2</kbd> 切換玩家 2／電腦／假人　<kbd>Esc</kbd> 返回　·　簡易操作：特殊＋↓ = 上勾拳／泡泡、特殊＋→ = 尖叫／紫米（傷害 8 成）</div>`;
 }
 renderHelp();
 

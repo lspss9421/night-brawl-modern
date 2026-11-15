@@ -218,8 +218,7 @@ export class CpuPlayer {
 
     if (dist > 330) {
       if (sp?.projectile && hasDrive && !s.projectiles.some((pr) => pr.owner === s.fighters.indexOf(me)) && r < 0.3 + p.aggression * 0.2) {
-        if (this.level === 'easy') press(Btn.SP);
-        else this.plan = this.motion236(fwd, Btn.M); // 搓招（全傷害；↓↘→＋輕是 Sawa 旋踢／Mio 貓咪，所以用中）
+        press(Btn.SP); // 愛心波動只能按特殊鍵
       }
       else if (r < 0.15 * p.aggression) this.plan = [{ bits: fwd, frames: 1 }, { bits: 0, frames: 1 }, { bits: fwd, frames: 6 }]; // 衝刺
       else walk(fwd, 18);
@@ -268,10 +267,6 @@ export class CpuPlayer {
     this.plan = [{ bits: first, frames: 2 }, { bits: first & Btn.DOWN, frames: 1 }];
   }
 
-  /** ↓↘→ + 按鍵 */
-  private motion236(fwd: number, btn: number): Step[] {
-    return [{ bits: Btn.DOWN, frames: 1 }, { bits: Btn.DOWN | fwd, frames: 1 }, { bits: fwd, frames: 1 }, { bits: fwd | btn, frames: 2 }];
-  }
 
   /** →↓↘ + 按鍵 */
   private motion623(fwd: number, btn: number): Step[] {

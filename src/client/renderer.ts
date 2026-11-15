@@ -48,6 +48,11 @@ interface HudPart { name: string; w: number; h: number; slots: Box[] }
 interface HudArt { hp: HudPart; drive: HudPart; meter: HudPart }
 let hudArt: HudArt | null = null;
 const hudImages: Record<string, HTMLImageElement> = {};
+// 能量滿時的火焰動畫（影片轉成的 18 格、每秒 15 格；黑底，用「相加」畫上去黑色就看不見）
+const meterFire = new Image();
+meterFire.src = `${import.meta.env.BASE_URL}assets/ui/meter_fire.jpg`;
+const FIRE = { frames: 18, w: 344, h: 97, slotX: 26.9, slotY: 57.5, slotW: 289, slotH: 11.5, every: 4 };
+
 void fetch(`${import.meta.env.BASE_URL}assets/ui/hud.json`)
   .then((r) => (r.ok ? r.json() : null))
   .then((j: HudArt | null) => {
@@ -169,7 +174,10 @@ export class Renderer {
       const m = currentMove(f);
       if (f.charId === 'sawa' && f.action === 'attack' && m?.kind === 'super') this.drawSpotlights(this.sx(f.x), f.frame, m.startup + m.active + m.recovery);
     }
-    for (const f of s.fighters) this.drawFighter(s, f, opt.showBoxes);
+    // 正在出招的角色畫在前面（例如自拍閃光秀手機時不會被貼著的對手擋住）
+    const order = [...s.fighters].sort((a, b) => (a.action === 'attack' ? 1 : 0) - (b.action === 'attack' ? 1 : 0));
+    for (const f of order) this.drawFighter(s, f, opt.showBoxes);
+    for (const f of s.fighters) this.drawSoundWave(f);
     this.drawSuperEffects(s);
     for (const p of s.projectiles) this.drawProjectile(s, p);
     for (const sp of s.sparks) this.drawSpark(sp.x, sp.y, sp.timer, sp.kind);
@@ -423,9 +431,156 @@ export class Renderer {
       this.drawSprite(set, frameAt(anim, s.frame, true), this.sx(p.x), this.sy(p.y), facing, 1);
     } else if (m?.latch) {
       this.drawCatPlaceholder(this.sx(p.x), this.sy(p.y), facing, !!p.latch, s.frame, waiting);
+    } else if (base === 'bubble') {
+      this.drawBubblePlaceholder(projBox(s, p), s.frame);
     } else {
       this.drawHeart(projBox(s, p));
     }
+  }
+
+  /** 能量滿：條裡面竄動的電光＋整條被真實的火焰包住（火焰是影片做成的循環動畫） */
+  private drawMeterFire(x: number, y: number, w: number, h: number, t: number, flip: boolean): void {
+    const g = this.ctx;
+    g.save();
+    g.globalCompositeOperation = 'lighter';
+    // 條裡面的電光：幾條鋸齒狀的亮線，每幾格換一次
+    g.beginPath();
+    g.rect(x, y, w, h);
+    g.clip();
+    const seed = Math.floor(t / 3);
+    for (let n = 0; n < 3; n++) {
+      let px = x + ((seed * 53 + n * 97) % Math.max(1, w));
+      let py = y + h / 2;
+      g.strokeStyle = n === 0 ? 'rgba(255,255,255,0.9)' : 'rgba(255,230,120,0.7)';
+      g.lineWidth = n === 0 ? 1.5 : 1;
+      g.beginPath();
+      g.moveTo(px, py);
+      for (let k = 0; k < 7; k++) {
+        px += 10 + ((seed * 7 + k * 13 + n * 5) % 14);
+        py = y + 2 + ((seed * 11 + k * 17 + n * 3) % Math.max(1, h - 4));
+        g.lineTo(px, py);
+      }
+      g.stroke();
+    }
+    g.restore();
+    if (!meterFire.complete || !meterFire.naturalWidth) { this.drawMeterFlames(x, y, w, h, t); return; }
+    // 火焰：把影片裡那條黑色橫條對齊能量條（左右對齊、上下置中）
+    const k = Math.floor(t / FIRE.every) % FIRE.frames;
+    const sx = w / FIRE.slotW;
+    const sy = sx * 2.2; // 火焰往上拉高，像參考圖那樣竄得比條高很多
+    const dw = FIRE.w * sx;
+    const dh = FIRE.h * sy;
+    const dx = x - FIRE.slotX * sx;
+    const dy = y + h / 2 - (FIRE.slotY + FIRE.slotH / 2) * sy;
+    g.save();
+    g.globalCompositeOperation = 'lighter';
+    if (flip) { g.translate(dx * 2 + dw, 0); g.scale(-1, 1); }
+    g.drawImage(meterFire, 0, k * FIRE.h, FIRE.w, FIRE.h, dx, dy, dw, dh);
+    g.globalAlpha = 0.45; // 再疊一次讓火更亮
+    g.drawImage(meterFire, 0, k * FIRE.h, FIRE.w, FIRE.h, dx, dy, dw, dh);
+    g.restore();
+  }
+
+  /** 能量滿時，能量條周圍冒出的火焰（一排會晃動的火舌＋往上飄的火星）；t 用遊戲影格，畫面才會一致 */
+  private drawMeterFlames(x: number, y: number, w: number, h: number, t: number): void {
+    const g = this.ctx;
+    g.save();
+    g.globalCompositeOperation = 'lighter';
+    // 火舌：兩層（外層橘紅、內層黃白），寬窄高低不規則，像真的火在晃
+    const tongue = (bx: number, by: number, fw: number, fh: number, sway: number, c0: string, c1: string) => {
+      const grad = g.createLinearGradient(bx, by, bx + sway, by - fh);
+      grad.addColorStop(0, c0);
+      grad.addColorStop(1, c1);
+      g.fillStyle = grad;
+      g.beginPath();
+      g.moveTo(bx - fw, by);
+      g.bezierCurveTo(bx - fw, by - fh * 0.45, bx + sway - fw * 0.35, by - fh * 0.7, bx + sway, by - fh);
+      g.bezierCurveTo(bx + sway + fw * 0.35, by - fh * 0.7, bx + fw, by - fh * 0.45, bx + fw, by);
+      g.closePath();
+      g.fill();
+    };
+    for (let n = 0; ; n++) {
+      const k = n * 1.9;
+      const bx = x + n * 13 + Math.sin(k * 2.3) * 4;
+      if (bx > x + w + 4) break;
+      const by = y + h * 0.7;
+      const big = (n % 5 === 2 ? 1.5 : 1) * (0.8 + 0.4 * Math.abs(Math.sin(k * 1.7)));
+      const fh = (h + 14) * big + Math.sin(t * 0.23 + k) * 8 + Math.sin(t * 0.41 + k * 2.1) * 5;
+      const fw = 7 + Math.abs(Math.sin(k * 3.1)) * 6;
+      const sway = Math.sin(t * 0.17 + k) * 5 + Math.sin(t * 0.29 + k * 0.6) * 3;
+      tongue(bx, by, fw, fh, sway, 'rgba(255,70,0,0.8)', 'rgba(255,150,0,0)');
+      tongue(bx + sway * 0.2, by, fw * 0.55, fh * 0.62, sway * 0.7, 'rgba(255,220,90,0.85)', 'rgba(255,255,200,0)');
+    }
+    // 下緣、兩端的光暈
+    const glow = g.createLinearGradient(0, y - 6, 0, y + h + 8);
+    glow.addColorStop(0, 'rgba(255,120,0,0.0)');
+    glow.addColorStop(0.5, 'rgba(255,110,0,0.45)');
+    glow.addColorStop(1, 'rgba(255,60,0,0.0)');
+    g.fillStyle = glow;
+    g.fillRect(x - 10, y - 6, w + 20, h + 14);
+    // 火星：往上飄、慢慢消失
+    for (let n = 0; n < 10; n++) {
+      const life = 40;
+      const p = ((t + n * 13) % life) / life;
+      const ex = x + ((n * 97 + Math.floor((t + n * 13) / life) * 53) % Math.max(1, w));
+      const ey = y - p * 34;
+      g.fillStyle = `rgba(255,${180 + Math.round(60 * (1 - p))},80,${(1 - p) * 0.9})`;
+      g.fillRect(ex, ey, 2, 2);
+    }
+    g.restore();
+  }
+
+  /** 麥克風尖叫：從麥克風往前擴散的粉紅音波圈，一路推到攻擊範圍的盡頭 */
+  private drawSoundWave(f: FighterState): void {
+    const m = currentMove(f);
+    if (!m?.eatsProjectiles || f.action !== 'attack' || !m.hitbox) return;
+    const life = m.active + 10;
+    const t = (f.frame - m.startup) / life;
+    if (t <= 0 || t >= 1) return;
+    const g = this.ctx;
+    const mx = this.sx(f.x + 45 * FP * f.facing); // 麥克風的位置
+    const my = this.sy(f.y + 135 * FP);
+    const reach = (m.hitbox.x + m.hitbox.w - 45) * (this.sx(FP * 100) - this.sx(0)) / 100;
+    g.save();
+    for (let k = 0; k < 3; k++) {
+      const p = t * 1.35 - k * 0.18;
+      if (p <= 0 || p >= 1) continue;
+      const r = 20 + reach * p;
+      const a = (1 - p) * 0.9;
+      const a0 = f.facing === 1 ? -0.55 : Math.PI - 0.55;
+      g.lineWidth = 7 + (1 - p) * 5;
+      g.strokeStyle = `rgba(255,120,190,${a})`;
+      g.beginPath(); g.arc(mx - f.facing * 20, my, r, a0, a0 + 1.1); g.stroke();
+      g.lineWidth = 3;
+      g.strokeStyle = `rgba(255,255,255,${a})`;
+      g.beginPath(); g.arc(mx - f.facing * 20, my, r, a0 + 0.08, a0 + 1.02); g.stroke();
+    }
+    g.restore();
+  }
+
+  /** 瞌睡泡泡還沒有動畫時的暫代圖：半透明彩虹泡泡＋反光＋Zzz，會輕輕晃 */
+  private drawBubblePlaceholder(b: Box, frame: number): void {
+    const g = this.ctx;
+    const cx = this.sx(b.x + b.w / 2);
+    const cy = this.sy(b.y + b.h / 2);
+    const r = (b.w / FP) / 2 + Math.sin(frame / 6) * 2;
+    g.save();
+    const grad = g.createRadialGradient(cx - r * 0.3, cy - r * 0.3, r * 0.1, cx, cy, r);
+    grad.addColorStop(0, 'rgba(255,255,255,0.35)');
+    grad.addColorStop(0.7, 'rgba(160,210,255,0.25)');
+    grad.addColorStop(1, 'rgba(255,170,220,0.55)');
+    g.fillStyle = grad;
+    g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,0.8)';
+    g.lineWidth = 2;
+    g.stroke();
+    g.fillStyle = 'rgba(255,255,255,0.9)';
+    g.beginPath(); g.ellipse(cx - r * 0.4, cy - r * 0.45, r * 0.18, r * 0.1, -0.6, 0, Math.PI * 2); g.fill();
+    g.fillStyle = 'rgba(120,140,255,0.9)';
+    g.font = `bold ${Math.round(r * 0.5)}px ${FONT}`;
+    g.textAlign = 'center';
+    g.fillText('Zzz', cx + 2, cy + r * 0.2);
+    g.restore();
   }
 
   /** 貓咪還沒有動畫時的暫代圖：灰白貓臉＋耳朵；抓臉時左右抖、冒抓痕 */
@@ -609,6 +764,22 @@ export class Renderer {
         g.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
       }
       g.stroke();
+      return;
+    }
+    if (kind === 'bpop') {
+      // 瞌睡泡泡爆開：有動畫就播 Mio 的 bubble_pop，沒有就畫一圈水珠
+      const set = sprites.get('mio');
+      const anim = set?.data.animations.bubble_pop;
+      if (set && anim?.frames.length) {
+        this.drawSprite(set, frameAt(anim, 20 - timer, false), cx, cy, 1, 1);
+      } else {
+        g.fillStyle = `rgba(170,220,255,${timer / 20})`;
+        for (let k = 0; k < 8; k++) {
+          const a = (k / 8) * Math.PI * 2;
+          const r = (20 - timer) * 4 + 10;
+          g.beginPath(); g.arc(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 5, 0, Math.PI * 2); g.fill();
+        }
+      }
       return;
     }
     if (kind === 'counter' || kind === 'punish') {
@@ -886,7 +1057,7 @@ export class Renderer {
           g.fillRect(sx + 2, 60, segW - 4, 9);
           const fill = Math.max(0, Math.min(1, (f.drive - k * DRIVE_BAR) / DRIVE_BAR));
           if (fill > 0) {
-            g.fillStyle = f.burnout ? (Math.floor(s.frame / 10) % 2 ? '#777' : '#555') : fill >= 1 ? '#69f0ae' : '#2e9d6a';
+            g.fillStyle = f.burnout ? (Math.floor(s.frame / 10) % 2 ? '#777' : '#555') : fill >= 1 ? '#42a5f5' : '#1e5fa8'; // 鬥氣：藍色
             const fw = (segW - 4) * fill;
             g.fillRect(left ? sx + 2 + (segW - 4) - fw : sx + 2, 60, fw, 9);
           }
@@ -916,14 +1087,15 @@ export class Renderer {
         g.fillStyle = '#222';
         g.fillRect(mx, 676, mw, 18);
         const full = f.meter >= METER_MAX;
-        g.fillStyle = full ? (Math.floor(s.frame / 6) % 2 ? '#40c4ff' : '#e1f5fe') : '#29b6f6';
+        if (full) this.drawMeterFire(mx, 676, mw, 18, s.frame, !left);
+        g.fillStyle = full ? (Math.floor(s.frame / 6) % 2 ? '#ffca28' : '#fff3e0') : '#ffa000';
         g.fillRect(mx, 676, (mw * f.meter) / METER_MAX, 18);
         g.strokeStyle = '#fff';
         g.strokeRect(mx, 676, mw, 18);
         g.font = `bold 16px ${FONT}`;
         g.fillStyle = '#fff';
         g.textAlign = left ? 'left' : 'right';
-        g.fillText(full ? '必殺技 OK！（L+K）' : '能量', left ? mx : mx + mw, 668);
+        if (full) g.fillText('必殺技 OK', left ? mx : mx + mw, 668);
         // 變身倒數
         if (f.form === 'dino') {
           g.fillStyle = '#ffca28';
@@ -992,7 +1164,7 @@ export class Renderer {
     order.forEach((b, k) => {
       const fill = Math.max(0, Math.min(1, (f.drive - k * DRIVE_BAR) / DRIVE_BAR));
       if (fill <= 0) return;
-      g.fillStyle = f.burnout ? (blink(10) ? '#777' : '#555') : fill >= 1 ? '#69f0ae' : '#2e9d6a';
+      g.fillStyle = f.burnout ? (blink(10) ? '#777' : '#555') : fill >= 1 ? '#42a5f5' : '#1e5fa8'; // 鬥氣：藍色
       const fw = Math.round(b.w * fill);
       g.fillRect(left ? b.x + b.w - fw : b.x, b.y, fw, b.h);
     });
@@ -1001,10 +1173,17 @@ export class Renderer {
     const [mb] = frame(art.meter, 30, SCREEN_H - art.meter.h - 8);
     const full = f.meter >= METER_MAX;
     const mw = Math.round((mb.w * f.meter) / METER_MAX);
-    g.fillStyle = full ? (blink(6) ? '#40c4ff' : '#e1f5fe') : '#29b6f6';
+    // 能量：金橘色；滿了框的周圍冒火焰（等框畫完再畫，才不會被框蓋住）
+    if (full) {
+      const grad = g.createLinearGradient(0, mb.y, 0, mb.y + mb.h);
+      grad.addColorStop(0, blink(6) ? '#fff8e1' : '#ffe082');
+      grad.addColorStop(1, '#ff8f00');
+      g.fillStyle = grad;
+    } else g.fillStyle = '#ffa000';
     g.fillRect(left ? mb.x : mb.x + mb.w - mw, mb.y, mw, mb.h);
 
     for (const d of frames) d();
+    if (full) this.drawMeterFire(mb.x, mb.y, mb.w, mb.h, s.frame + i * 23, !left);
 
     // 文字：燃盡、名字、勝場、能量提示、變身倒數
     g.textAlign = left ? 'left' : 'right';
@@ -1035,13 +1214,15 @@ export class Renderer {
       g.stroke();
     }
     const my = SCREEN_H - art.meter.h - 14;
-    g.font = `bold 16px ${FONT}`;
-    g.fillStyle = full ? '#fff59d' : '#fff';
-    g.strokeStyle = 'rgba(0,0,0,0.7)';
-    g.lineWidth = 4;
-    const mt = full ? '必殺技 OK！（L+K）' : '能量';
-    g.strokeText(mt, inner(40), my);
-    g.fillText(mt, inner(40), my);
+    if (full) {
+      // 能量滿了才顯示
+      g.font = `bold 18px ${FONT}`;
+      g.fillStyle = blink(8) ? '#ffe082' : '#fff8e1';
+      g.strokeStyle = 'rgba(120,30,0,0.9)';
+      g.lineWidth = 5;
+      g.strokeText('必殺技 OK', inner(40), my - 4);
+      g.fillText('必殺技 OK', inner(40), my - 4);
+    }
     if (f.form === 'dino') {
       g.fillStyle = '#ffca28';
       const t = `恐龍形態 ${Math.ceil(f.formTimer / 60)} 秒`;
@@ -1098,9 +1279,69 @@ export class Renderer {
     const bandH = 82;
     const cardH = photoH + bandH;
     const gap = 70;
-    const total = ids.length * cardW + (ids.length - 1) * gap;
+    const slots = ids.length + 1; // 最後一格是「？ 即將登場」
+    const total = slots * cardW + (slots - 1) * gap;
     const y = 182;
-    ids.forEach((id, k) => {
+    const cursorX = (k: number): number => SCREEN_W / 2 - total / 2 + k * (cardW + gap);
+    const drawCursor = (k: number): void => {
+      const x = cursorX(k);
+      // 選擇中的玩家：外圈框線，P1／P2 標籤放在卡片上方（不蓋到照片和文字）
+      for (const p of [0, 1] as const) {
+        if (cursor[p] !== k) continue;
+        g.strokeStyle = p === 0 ? '#ff5252' : '#448aff';
+        g.lineWidth = 6;
+        const pad = p === 0 ? 12 : 20;
+        roundRect(g, x - pad, y - pad, cardW + pad * 2, cardH + pad * 2, 20);
+        g.stroke();
+        g.fillStyle = g.strokeStyle;
+        g.font = `bold 22px ${FONT}`;
+        g.textAlign = p === 0 ? 'left' : 'right';
+        g.fillText(`${tags[p]}${ready[p] ? ' ✔' : ''}`, p === 0 ? x - 10 : x + cardW + 10, y - 26);
+        g.textAlign = 'center';
+      }
+    };
+    // 即將登場：暗色卡片、大問號，不能選
+    {
+      const k = ids.length;
+      const x = SCREEN_W / 2 - total / 2 + k * (cardW + gap);
+      g.save();
+      roundRect(g, x, y, cardW, cardH, 16);
+      g.clip();
+      const bg = g.createLinearGradient(0, y, 0, y + photoH);
+      bg.addColorStop(0, '#2a2240');
+      bg.addColorStop(1, '#0e0b18');
+      g.fillStyle = bg;
+      g.fillRect(x, y, cardW, cardH);
+      g.fillStyle = 'rgba(10,8,18,0.98)';
+      g.fillRect(x, y + photoH, cardW, bandH);
+      g.fillStyle = '#6e6690';
+      g.fillRect(x, y + photoH, cardW, 4);
+      g.restore();
+      g.strokeStyle = '#6e6690';
+      g.lineWidth = 5;
+      roundRect(g, x, y, cardW, cardH, 16);
+      g.stroke();
+      g.strokeStyle = 'rgba(255,255,255,0.35)';
+      g.lineWidth = 1.5;
+      roundRect(g, x + 4, y + 4, cardW - 8, cardH - 8, 13);
+      g.stroke();
+      g.textAlign = 'center';
+      g.save();
+      g.shadowColor = 'rgba(180,160,255,0.8)';
+      g.shadowBlur = 24;
+      g.fillStyle = '#d8d0ff';
+      g.font = `bold 190px ${FONT}`;
+      g.fillText('？', x + cardW / 2, y + photoH / 2 + 66);
+      g.restore();
+      g.fillStyle = '#fff';
+      g.font = `bold 28px ${FONT}`;
+      g.fillText('即將登場', x + cardW / 2, y + photoH + 38);
+      g.font = `18px ${FONT}`;
+      g.fillStyle = '#a89fc8';
+      g.fillText('COMING SOON', x + cardW / 2, y + photoH + 66);
+    }
+    [...ids, ''].forEach((id, k) => {
+      if (!id) { drawCursor(k); return; }
       const c = getChar(id);
       const x = SCREEN_W / 2 - total / 2 + k * (cardW + gap);
       // 卡片底和照片
@@ -1144,20 +1385,7 @@ export class Renderer {
       g.font = `18px ${FONT}`;
       g.fillStyle = '#e8e0ff';
       g.fillText(SELECT_TAG[id] ?? '', x + cardW / 2, y + photoH + 66);
-      // 選擇中的玩家：外圈框線，P1／P2 標籤放在卡片上方（不蓋到照片和文字）
-      for (const p of [0, 1] as const) {
-        if (cursor[p] !== k) continue;
-        g.strokeStyle = p === 0 ? '#ff5252' : '#448aff';
-        g.lineWidth = 6;
-        const pad = p === 0 ? 12 : 20;
-        roundRect(g, x - pad, y - pad, cardW + pad * 2, cardH + pad * 2, 20);
-        g.stroke();
-        g.fillStyle = g.strokeStyle;
-        g.font = `bold 22px ${FONT}`;
-        g.textAlign = p === 0 ? 'left' : 'right';
-        g.fillText(`${tags[p]}${ready[p] ? ' ✔' : ''}`, p === 0 ? x - 10 : x + cardW + 10, y - 26);
-        g.textAlign = 'center';
-      }
+      drawCursor(k);
     });
     g.fillStyle = '#fff';
     g.font = `bold 22px ${FONT}`;

@@ -89,7 +89,8 @@ const DIZZY_FRAMES = 110; // 燃盡時在牆邊防禦鬥氣衝擊：暈眩
 const MOTION_WINDOW = 18; // 搓招要在幾格內完成
 const ASSIST_PCT = 80; // 簡易操作（特殊鍵）出的特殊技傷害 8 成
 /** 數字鍵盤方向（6 = 前）。依序找得到就算（中間按到別的方向沒關係） */
-const MOTIONS: Record<'236' | '623' | '214', number[][]> = {
+const MOTIONS: Record<'262' | '236' | '623' | '214', number[][]> = {
+  '262': [[2, 6, 2], [2, 3, 2]], // ↓→↓（按到 ↘ 也算）
   '623': [[6, 2, 3]],
   '236': [[2, 3, 6], [2, 6]],
   '214': [[2, 1, 4], [2, 4]],
@@ -149,6 +150,7 @@ function newFighter(charId: string, side: 0 | 1, wins: number): FighterState {
     armorUsed: 0,
     wallSplat: false,
     afterCrumple: false,
+    hitLanded: false,
   };
 }
 
@@ -225,6 +227,10 @@ function isCrouching(f: FighterState): boolean {
 }
 
 function isAirborne(f: FighterState): boolean {
+  if (f.action === 'attack') {
+    const a = currentMove(f)?.airborne; // 動畫裡跳起來的招（例如枕頭飛撲）
+    if (a && f.frame >= a[0] && f.frame <= a[1]) return true;
+  }
   return f.y > 0 || f.action === 'air' || f.action === 'airHit';
 }
 
@@ -437,6 +443,7 @@ function startMove(s: GameState, i: 0 | 1, id: string): void {
   f.rushBonus = false;
   f.assisted = false;
   f.armorUsed = 0;
+  f.hitLanded = false;
   if (m.invuln) f.invuln = Math.max(f.invuln, m.invuln);
   if (m.superFreeze) s.superFreeze = { owner: i, timer: m.superFreeze };
   if (m.kind === 'taunt') f.bubble = { text: getChar(f.charId).texts.taunt, timer: TAUNT_FRAMES };
@@ -744,7 +751,7 @@ function moveUsable(s: GameState, f: FighterState, id: string): boolean {
 function commandMove(s: GameState, f: FighterState, st: FormStats, b: InputBits, both: InputBits, input: InputBits): { id: string; assisted: boolean } | null {
   const cmds = st.cmds ?? [];
   if (!cmds.length) return null;
-  for (const motion of ['623', '236', '214'] as const) {
+  for (const motion of ['262', '623', '236', '214'] as const) { // ↓→↓ 要先判斷（它也含有 ↓…→）
     if (!cmds.some((c) => c.motion === motion) || !motionDone(s, f, motion)) continue;
     for (const c of cmds) {
       if (c.motion !== motion) continue;
@@ -757,8 +764,9 @@ function commandMove(s: GameState, f: FighterState, st: FormStats, b: InputBits,
     const v = held(input, Btn.DOWN) ? 'd' : horizontal(input, f.facing) === 1 ? 'f' : 'n';
     const c = cmds.find((x) => x.sp === v) ?? cmds.find((x) => x.sp === 'n');
     // 簡易操作的 OD：特殊 + 中（特殊 + 重是必殺技）
-    if (c?.od && (both & Btn.M) && moveUsable(s, f, c.od)) return { id: c.od, assisted: true };
-    if (c && moveUsable(s, f, c.move)) return { id: c.move, assisted: true };
+    // 只能用特殊鍵出的招（愛心波動、鞭擊）不算簡易操作：全傷害
+    if (c?.od && (both & Btn.M) && moveUsable(s, f, c.od)) return { id: c.od, assisted: !c.spOnly };
+    if (c && moveUsable(s, f, c.move)) return { id: c.move, assisted: !c.spOnly };
   }
   return null;
 }
@@ -794,7 +802,7 @@ function setCrumple(d: FighterState, frames: number, wall: boolean, pushDir: 1 |
 function tryGrab(s: GameState, i: 0 | 1): void {
   const f = s.fighters[i];
   const o = s.fighters[1 - i];
-  if (Math.abs(o.x - f.x) > THROW_RANGE || o.invuln > 0 || o.y !== 0) return;
+  if (Math.abs(o.x - f.x) > THROW_RANGE || o.invuln > 0 || o.y !== 0 || isAirborne(o)) return;
   // 雙方同時投 → 自動拆投
   if (o.action === 'attack' && currentMove(o)?.kind === 'throw' && movePhase(o) === 'active') {
     f.hitsDone = 1;
@@ -876,7 +884,7 @@ function updateAttack(s: GameState, i: 0 | 1, input: InputBits, c: CharacterDef,
   // 特殊技剛出的前 3 格：補按第二顆攻擊鍵（簡易操作補按中）= 升級成 OD（鍵盤很難兩個鍵剛好同一格按下）
   if (m.kind === 'special' && !m.od && f.frame <= 3) {
     const cmd = st.cmds?.find((x) => x.move === m.id && x.od);
-    const odPressed = f.assisted ? (input & (Btn.SP | Btn.M)) === (Btn.SP | Btn.M) : attackCount(input) >= 2;
+    const odPressed = f.assisted || cmd?.spOnly ? (input & (Btn.SP | Btn.M)) === (Btn.SP | Btn.M) : attackCount(input) >= 2;
     const od = cmd?.od ? c.moves[cmd.od] : undefined;
     if (od && odPressed && !f.burnout && f.drive + (m.driveCost ?? 0) >= (od.driveCost ?? 0)) {
       const assisted = f.assisted;
@@ -906,7 +914,7 @@ function updateAttack(s: GameState, i: 0 | 1, input: InputBits, c: CharacterDef,
     if (f.action !== 'attack') return;
   }
 
-  if (m.advance && f.frame <= m.startup + m.active) f.x += m.advance * f.facing;
+  if (m.advance && f.frame <= m.startup + m.active && f.frame >= (m.advanceFrom ?? 0)) f.x += m.advance * f.facing;
 
   // 召喚物：先出現在腳邊等著，到 spawnFrame 才飛出去
   const sm = m.projectile?.summon;
@@ -917,6 +925,7 @@ function updateAttack(s: GameState, i: 0 | 1, input: InputBits, c: CharacterDef,
       x: f.x + sm.x * FP * f.facing,
       y: sm.y * FP,
       vx: m.projectile.speed * f.facing,
+      vy: m.projectile.rise,
       life: m.projectile.life ?? 300,
       assisted: f.assisted,
       wait: m.projectile.spawnFrame - sm.frame,
@@ -931,6 +940,7 @@ function updateAttack(s: GameState, i: 0 | 1, input: InputBits, c: CharacterDef,
       x: f.x + m.projectile.spawnX * FP * f.facing,
       y: m.projectile.spawnY * FP,
       vx: m.projectile.speed * f.facing,
+      vy: m.projectile.rise,
       life: m.projectile.life ?? 300,
       assisted: f.assisted,
     });
@@ -951,7 +961,10 @@ function updateAttack(s: GameState, i: 0 | 1, input: InputBits, c: CharacterDef,
     if (f.y <= 0) { f.y = 0; f.vy = 0; f.vx = 0; }
   }
 
-  if (f.frame >= moveTotal(m)) {
+  // 沒打中就提早收招（剩下的動畫取消）
+  const whiffEnd = m.whiffRecovery !== undefined && !f.hitLanded && f.frame > m.startup + m.active
+    ? m.startup + m.active + m.whiffRecovery : Infinity;
+  if (f.frame >= Math.min(moveTotal(m), whiffEnd)) {
     if (m.stance === 'air') setAction(f, 'air');
     else setAction(f, 'idle');
   }
@@ -1008,12 +1021,14 @@ function updateProjectiles(s: GameState): void {
       if (['knockdown', 'getup', 'airHit', 'thrown'].includes(o.action) || o.hp <= 0) p.life = 0;
     } else {
       p.x += p.vx;
+      if (p.vy) p.y += p.vy;
       // 從腳邊跳起來：高度慢慢往目標（臉的高度）靠
       if (p.targetY !== undefined && p.y !== p.targetY) p.y += Math.trunc((p.targetY - p.y) / 3) || Math.sign(p.targetY - p.y);
       p.life--;
     }
     // 召喚物沒打中（飛完了）或被打斷：冒一團煙消失
     if (p.life <= 0 && projMove(s, p).latch) s.sparks.push({ x: p.x, y: p.y, timer: 24, kind: 'puff' });
+    if (p.life <= 0 && projMove(s, p).projectile?.endPuff) s.sparks.push({ x: p.x, y: p.y, timer: 20, kind: 'bpop' }); // 泡泡飄完：自己破掉
   }
   // 兩發飛行道具互相抵銷
   if (s.projectiles.length === 2) {
@@ -1053,6 +1068,19 @@ interface PendingHit {
 }
 
 function detectHits(s: GameState): void {
+  // 音波等可以抵銷飛行道具的攻擊：碰到對手的飛行道具就把它消掉
+  for (const i of [0, 1] as const) {
+    const m = currentMove(s.fighters[i]);
+    const hb = m?.eatsProjectiles ? activeHitbox(s.fighters[i]) : null;
+    if (!hb) continue;
+    for (const p of s.projectiles) {
+      if (p.owner === i || p.latch || (p.wait && p.wait > 0) || p.life <= 0 || !overlap(projBox(s, p), hb)) continue;
+      p.life = 0;
+      const pm = projMove(s, p);
+      s.sparks.push({ x: p.x, y: p.y, timer: pm.projectile?.endPuff ? 20 : 24, kind: pm.projectile?.endPuff ? 'bpop' : 'puff' });
+    }
+  }
+  s.projectiles = s.projectiles.filter((p) => p.life > 0);
   const pending: PendingHit[] = [];
   for (const i of [0, 1] as const) {
     const f = s.fighters[i];
@@ -1098,6 +1126,7 @@ function detectHits(s: GameState): void {
   for (const h of pending) {
     const result = applyHit(s, h);
     const p = h.proj;
+    if (p && h.move.projectile?.endPuff) s.sparks.push({ x: p.x, y: p.y, timer: 20, kind: 'bpop' }); // 泡泡碰到人：爆開
     if (!p || !h.move.latch) continue;
     if (s.events[s.events.length - 1] !== 'scratch') s.events.push('scratch');
     if (p.latch) {
@@ -1277,6 +1306,7 @@ function applyHit(s: GameState, h: PendingHit): 'hit' | 'block' | 'parry' | 'arm
     d.frame = 0;
     d.stun = m.hitstun + stunBonus;
     d.crouchStun = wasCrouch;
+    if (m.dizzyHit) s.sparks.push({ x: d.x, y: d.y + 210 * FP, timer: d.stun, kind: 'dizzy' }); // 自拍閃光：頭暈轉星星
     d.vx = 0;
     if (d.y > 0) d.vy = 0;
     d.slide = m.pushback;
@@ -1295,11 +1325,15 @@ function applyHit(s: GameState, h: PendingHit): 'hit' | 'block' | 'parry' | 'arm
   s.hitstop = Math.max(s.hitstop, hitstop);
   s.sparks.push({ ...h.contact, timer: 12, kind: 'hit' });
   // 打中的爽感：最後一下打中時停頓久一點、畫面大震動，接著慢動作
-  if (m.slowmo && isLastHit) {
-    s.hitstop = Math.max(s.hitstop, 14);
-    shake(s, 8, 18);
+  // 搓招打中的爽感：第一下打中時停頓久一點、畫面大震動，接著慢動作（之後每一下都會延長慢動作，整段動畫看得清楚）
+  if (m.slowmo) {
+    if (!s.slowmo) {
+      s.hitstop = Math.max(s.hitstop, 14);
+      shake(s, 8, 18);
+    }
     s.slowmo = Math.max(s.slowmo ?? 0, m.slowmo);
   }
+  if (!h.fromProjectile) a.hitLanded = true;
   return 'hit';
 }
 

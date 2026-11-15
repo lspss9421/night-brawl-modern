@@ -97,8 +97,8 @@ export class OnlineGame {
     this.lastHeard = performance.now();
     const them = this.me === 0 ? 1 : 0;
     if (msg.k === 'pick') {
-      this.cursor[them] = Math.max(0, Math.min(CHARACTER_IDS.length - 1, msg.cursor));
-      this.ready[them] = msg.ready;
+      this.cursor[them] = Math.max(0, Math.min(CHARACTER_IDS.length, msg.cursor));
+      this.ready[them] = msg.ready && this.cursor[them] < CHARACTER_IDS.length;
       this.updateCountdown();
     } else if (msg.k === 'start') {
       this.timeLimit = msg.timeLimit ?? false; // 以房主的設定為準
@@ -188,7 +188,7 @@ export class OnlineGame {
   }
 
   private updateSelect(kb: Keyboard): void {
-    const n = CHARACTER_IDS.length;
+    const n = CHARACTER_IDS.length + 1; // 多一格「？ 即將登場」，不能確定
     const me = this.me;
     let changed = false;
     if (!this.ready[me]) {
@@ -196,8 +196,11 @@ export class OnlineGame {
       if (kb.consumeAny([...P1_KEYS.LEFT, ...P2_KEYS.LEFT])) { this.cursor[me] = (this.cursor[me] + n - 1) % n; changed = true; audio.play('menu'); }
       if (kb.consumeAny([...P1_KEYS.RIGHT, ...P2_KEYS.RIGHT])) { this.cursor[me] = (this.cursor[me] + 1) % n; changed = true; audio.play('menu'); }
       if (kb.consume('Enter')) { // 確定一律用 Enter
-        this.ready[me] = true; changed = true; audio.play('confirm');
-        if (CHARACTER_IDS[this.cursor[me]] === 'mio') audio.play('mio_select'); // 鎖定 Mio 播語音
+        if (this.cursor[me] >= CHARACTER_IDS.length) audio.play('menu'); // 即將登場的角色還不能選
+        else {
+          this.ready[me] = true; changed = true; audio.play('confirm');
+          if (CHARACTER_IDS[this.cursor[me]] === 'mio') audio.play('mio_select'); // 鎖定 Mio 播語音
+        }
       }
     } else if (kb.consumeAny([...P1_KEYS.L, ...P2_KEYS.L])) { this.ready[me] = false; changed = true; }
     if (changed) { this.sendPick(); this.updateCountdown(); }
